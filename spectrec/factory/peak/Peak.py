@@ -95,16 +95,18 @@ class Peak(metaclass = ABCMeta):
     # -- }}}
 
     # -- Abstract methods of the base class {{{
+    @abstractmethod
+    def generate(self, omega: torch.Tensor) -> torch.Tensor:
+        """ Generate a torch representation of the peak in the given energy range. """
+        pass
+    # -- }}}
+
+    # -- Abstract properties of the base class {{{
     @abstractproperty
     def _param_ids(self) -> Sequence[str]:
         """ Names of the parameters used in the class. For example, [A, M, W] in a Gaussian
         peak with parameters: amplitude (A), mass (M) and width (W).
         """
-        pass
-
-    @abstractmethod
-    def generate(self, omega: torch.Tensor) -> torch.Tensor:
-        """ Generate a torch representation of the peak in the given energy range. """
         pass
     # -- }}}
 

@@ -35,7 +35,7 @@ class Kernel(metaclass = ABCMeta):
 
     def __repr__(self) -> str:
         """ String representation of the object. """
-        return f'<{self._kernel_type}: Nt={self.Nt}, Nw={self.Nw}, w_range={self.w_range}>'
+        return self.__str__()
     # -- }}}
 
     # -- Abstract methods of the base class {{{

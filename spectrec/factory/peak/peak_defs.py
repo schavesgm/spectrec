@@ -74,13 +74,13 @@ class DeltaPeak(Peak):
 
     @property
     def M(self) -> float:
-        ''' Mass of the peak. '''
-        return self._params['M']
+        """ Mass of the peak. """
+        return self._param_values['M']
 
     @property
     def A(self) -> float:
-        ''' Amplitude of the peak. '''
-        return self._params['A']
+        """ Amplitude of the peak. """
+        return self._param_values['A']
 
 if __name__ == '__main__':
     pass

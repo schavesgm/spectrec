@@ -113,11 +113,12 @@ class Peak(metaclass = ABCMeta):
     # -- Magic methods of the class {{{
     def __str__(self) -> str:
         """ String representation of the object. """
-        return f'<{self._peak_type}: {self.params}>'
+        par_str = {k: round(v, 2) for k, v in self.params.items()}
+        return f'<{self._peak_type}: {par_str}'
 
     def __repr__(self) -> str:
         ''' String representation of the object. '''
-        return f'<{self._peak_type}: {self.params}>'
+        return self.__str__()
     # -- }}}
 
     # -- Property methods of the class {{{

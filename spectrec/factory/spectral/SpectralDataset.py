@@ -403,4 +403,3 @@ class SpectralDataset(torch.utils.data.Dataset):
 
 if __name__ == '__main__':
     pass
-

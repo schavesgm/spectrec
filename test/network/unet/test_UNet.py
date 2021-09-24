@@ -11,6 +11,7 @@ from spectrec.network import UNet
 
 class TestUNet:
 
+
     def test_setparams_cpu(self):
         """ Test the correctness of the parameter copy. """
 
@@ -27,7 +28,7 @@ class TestUNet:
         for w1, w2 in zip(net1.state_dict().values(), net2.state_dict().values()):
             assert torch.all(torch.eq(w1, w2))
 
-    @pytest.mark.skipif('not torch.cuda.is_available()', reason = 'CUDA is not available')
+    @pytest.mark.skipif('not torch.cuda.is_available()', reason='CUDA is not available')
     def test_setparams_gpu(self):
         """ Set the parameters using a GPU dataparallel module. """
 
@@ -57,10 +58,11 @@ class TestUNet:
         assert os.path.exists('./status/net/test.pt')
 
         # Assert that we can load the parameters from the file
-        net.load_params('test', verbose = False)
+        net.load_params('test', verbose=False)
 
         # Delete the newly created folder
         shutil.rmtree('./status')
+
 
 if __name__ == '__main__':
     pass

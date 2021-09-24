@@ -8,14 +8,15 @@ import torch
 # Load the Peak class to be used as interface
 from .Peak import Peak
 
+
 class GaussianPeak(Peak):
-    ''' Gaussian peak implementation. '''
+    """ Gaussian peak implementation. """
 
     # Name of the peak as a string, shared among all instances
     _peak_type: str           = 'GaussianPeak'
     _param_ids: Sequence[str] = ('M', 'A', 'W')
 
-    @lru_cache(maxsize = 2)
+    @lru_cache(maxsize=2)
     def generate(self, omega: torch.Tensor) -> torch.Tensor:
         """ Evaluate the Peak in the given energy range. The Peak is evaluated
         using the standard Gaussian formula.
@@ -47,15 +48,16 @@ class GaussianPeak(Peak):
         ''' Width of the peak. '''
         return self._param_values['W']
 
+
 class DeltaPeak(Peak):
-    ''' Dirac delta peak implemetation. '''
+    """ Dirac delta peak implemetation. """
 
     # Name of the peak as a string, shared among all instances
     _peak_type: str           = 'DeltaPeak'
     _param_ids: Sequence[str] = ('M', 'A')
 
     def generate(self, omega: torch.Tensor) -> torch.Tensor:
-        ''' Generate a numpy representation of the peak in the energy range. '''
+        """ Generate a numpy representation of the peak in the energy range. """
 
         # Step size in omega
         dw = float(omega[-1] - omega[0])
@@ -80,6 +82,7 @@ class DeltaPeak(Peak):
     def A(self) -> float:
         """ Amplitude of the peak. """
         return self._param_values['A']
+
 
 if __name__ == '__main__':
     pass

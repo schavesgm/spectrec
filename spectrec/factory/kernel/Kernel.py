@@ -6,10 +6,11 @@ from functools import lru_cache
 # -- Import third party modules
 import torch
 
+
 class Kernel(metaclass = ABCMeta):
 
-    def __init__(self, Nt: int, Nw: int, w_range: Sequence[float]):
 
+    def __init__(self, Nt: int, Nw: int, w_range: Sequence[float]):
         # The energy range should be a two dimensional object
         assert len(w_range) == 2, f'{w_range =} must be a 2-dimensional object.'
 
@@ -17,12 +18,12 @@ class Kernel(metaclass = ABCMeta):
         self.Nt, self.Nw, self.w_range = Nt, Nw, sorted(w_range)
 
     # -- Private methods of the class {{{
-    @lru_cache(maxsize = 1)
+    @lru_cache(maxsize=1)
     def __calculate_omega(self, Nw: int, w_min: float, w_max: float) -> torch.Tensor:
         """ Calculate the tensor containing all needed energies. """
         return torch.linspace(w_min, w_max, Nw)
 
-    @lru_cache(maxsize = 1)
+    @lru_cache(maxsize=1)
     def __calculate_tau(self, Nt: int) -> torch.Tensor:
         """ Calculate the tensor containing all needed times. """
         return torch.arange(0, Nt)
@@ -42,7 +43,7 @@ class Kernel(metaclass = ABCMeta):
     @abstractmethod
     def _calculate_kernel(self, Nt: int, Nw: int, w_min: float, w_max: float) -> torch.Tensor:
         """ Return the kernel as a torch tensor. """
-        pass
+        return
     # -- }}}
 
     # -- Property methods of the class {{{
@@ -71,6 +72,7 @@ class Kernel(metaclass = ABCMeta):
         """ Resolution of the energy space. """
         return (max(self.w_range) - min(self.w_range)) / self.Nw
     # -- }}}
+
 
 if __name__ == '__main__':
     pass

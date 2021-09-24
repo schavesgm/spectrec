@@ -10,13 +10,14 @@ import torch
 from spectrec.factory import Peak
 from spectrec.factory import Kernel
 
+
 class SpectralFunction:
     """ Spectral function object: composed of several peaks. """
 
     def __init__(
         self, peak_types: list[Peak], peak_limits: dict[str, Sequence[float]], kernel: Kernel, 
         max_np: int, fixed_np: bool = True, peak_ids: Optional[list] = None
-        ):
+    ):
 
         # Save the peak types used in the calculation and the limits
         self.peak_types, self.peak_limits = peak_types, peak_limits
@@ -162,7 +163,7 @@ class SpectralFunction:
     def plot_tensor_representation(self) -> plt.Figure:
 
         # Generate a figure where the data will be plotted
-        fig = plt.figure(figsize = (16, 12))
+        fig = plt.figure(figsize=(16, 12))
 
         # Add two axis to the figure, one for C and another for R
         axis_R = fig.add_subplot(1, 2, 1)
@@ -173,8 +174,8 @@ class SpectralFunction:
         axis_R.set_ylabel(r'$\rho(\omega)$')
         axis_C.set_xlabel(r'$\tau$')
         axis_C.set_ylabel(r'$C(\tau)$')
-        axis_R.grid('#343a40', alpha = 0.2)
-        axis_C.grid('#343a40', alpha = 0.2)
+        axis_R.grid('#343a40', alpha=0.2)
+        axis_C.grid('#343a40', alpha=0.2)
 
         # The correlation function axis should be in log scale
         axis_C.set_yscale('log')
@@ -183,26 +184,27 @@ class SpectralFunction:
         title = ''
         for ip, peak in enumerate(self.peaks):
             if ip % 2 != 1:
-                title += str(peak) + ' ' 
+                title += str(peak) + ' '
             else:
-                title += str(peak) + '\n' 
+                title += str(peak) + '\n'
 
         # Set the title of the picture as the peaks
         fig.suptitle(title)
 
         # Add the axis to the data
-        axis_R.plot(self.kernel.omega, self.compute_R(), color = '#84a98c')
-        axis_C.plot(self.kernel.tau,   self.compute_C(), color = '#014f86')
+        axis_R.plot(self.kernel.omega, self.compute_R(), color='#84a98c')
+        axis_C.plot(self.kernel.tau,   self.compute_C(), color='#014f86')
 
         return fig
 
     # -- Magic methods of the class {{{
     def __str__(self) -> str:
-        return f'<SpectralFunction>'
+        return '<SpectralFunction>'
 
     def __repr__(self) -> str:
         return self.__str__()
     # -- }}}
+
         
 if __name__ == '__main__':
     pass

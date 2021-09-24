@@ -9,11 +9,20 @@ python = "^3.8,<3.11"
 numpy = "^1.21.2"
 torch = "^1.9.0"
 matplotlib = "^3.4.3"
-pytest = "^6.2.5"
 PyYAML = "^5.4.1"
 
 [tool.poetry.dev-dependencies]
+pytest = "^6.2.5"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.flakehell]
+extended_default_ignore = []
+max_line_length = 100
+format = "colored"
+show_source = true
+
+[tool.flakehell.plugins]
+pylint = ["+*"]

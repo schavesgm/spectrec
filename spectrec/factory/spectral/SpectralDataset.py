@@ -17,13 +17,14 @@ from .SpectralFunction import SpectralFunction
 # -- Spectral function output tuple
 SpectralOut = namedtuple('SpectralOut', 'C L')
 
+
 class SpectralDataset(torch.utils.data.Dataset):
     """ Torch dataset containing spectral functions tranining sets. """
 
     def __init__(
         self, peak_types: list[Peak], peak_limits: dict[str, Sequence[float]],
         kernel: Kernel, max_np: int, fixed_np: bool = True, peak_ids: Optional[list] = None
-        ):
+    ):
 
         # Save the peak types and the limits used in the calculation
         self.peak_types, self.peak_limits = peak_types, peak_limits
@@ -58,8 +59,8 @@ class SpectralDataset(torch.utils.data.Dataset):
                 f'Basis dimensions must be = {basis.shape = } != ({self.kernel.Nw =}, {Ns = })'
 
         # Allocate enough memory for the spectral functions and correlation functions
-        self.__data['R'] = torch.empty(Nb, self.kernel.Nw, dtype = torch.float32)
-        self.__data['C'] = torch.empty(Nb, self.kernel.Nt, dtype = torch.float32)
+        self.__data['R'] = torch.empty(Nb, self.kernel.Nw, dtype=torch.float32)
+        self.__data['C'] = torch.empty(Nb, self.kernel.Nt, dtype=torch.float32)
 
         # Generate a spectral function object to sample the data
         spf_gen = SpectralFunction(
@@ -73,8 +74,8 @@ class SpectralDataset(torch.utils.data.Dataset):
             spf_gen.generate_random_peaks()
 
             # Get the tensor representation of R and C in the correlation function
-            self.__data['R'][nb,:] = spf_gen.compute_R(recalculate = True)
-            self.__data['C'][nb,:] = spf_gen.compute_C(recalculate = True)
+            self.__data['R'][nb, :] = spf_gen.compute_R(recalculate=True)
+            self.__data['C'][nb, :] = spf_gen.compute_C(recalculate=True)
 
         # Compute the basis functions if basis is not provided or basis is not loaded
         if basis is not None:
@@ -91,9 +92,9 @@ class SpectralDataset(torch.utils.data.Dataset):
         self.__data = {'R': None, 'C': None, 'U': None, 'L': None}
 
     def test(
-            self, network: torch.nn.Module, loss: torch.nn.Module, prop: float, device: torch.device, batch_size: int, 
-            prefix: str = '', suffix: str = '', rand: bool = True, path: str = './status/test'
-        ) -> dict:
+        self, network: torch.nn.Module, loss: torch.nn.Module, prop: float, device: torch.device, batch_size: int, 
+        prefix: str = '', suffix: str = '', rand: bool = True, path: str = './status/test'
+    ) -> dict:
 
         # Assert the dataset has been generated
         assert self.is_generated, 'Dataset cannot be tested as data is not generated.'
@@ -120,21 +121,21 @@ class SpectralDataset(torch.utils.data.Dataset):
         for batch in batch_idx:
             
             # Get the current batch from the set to test the results
-            C_batch = test_data['C'][batch,:].detach().to(device).log()
-            L_batch = test_data['L'][batch,:].detach().to(device)
+            C_batch = test_data['C'][batch, :].detach().to(device).log()
+            L_batch = test_data['L'][batch, :].detach().to(device)
 
             # Generate the correct dimensions of the network
             C_batch = C_batch.view(C_batch.shape[0], 1, C_batch.shape[1])
             L_batch = L_batch.view(L_batch.shape[0], 1, L_batch.shape[1])
 
             # Calculate the prediction of the network
-            L_pred = network(C_batch).detach()
+            L_pred = net_test(C_batch).detach()
 
             # Calculate the loss function value
             loss_value += float(loss(L_pred, L_batch, C_batch).detach())
 
             # Save the predicted coefficients of the network
-            buffer_pred[batch,:] = L_pred.cpu().view(len(batch), self.Ns)
+            buffer_pred[batch, :] = L_pred.cpu().view(len(batch), self.Ns)
 
             # Delete the uneeded tensors
             del C_batch, L_batch, L_pred
@@ -151,7 +152,7 @@ class SpectralDataset(torch.utils.data.Dataset):
 
         # Dictionary containing information to monitor the test_set
         json_info = self.info | {
-            'test': { 
+            'test': {
                 'Nb':   Nb_test,
                 'prop': prop,
                 'loss': float(loss_value / Nb_test),
@@ -161,12 +162,12 @@ class SpectralDataset(torch.utils.data.Dataset):
         }
 
         # Dump the information into the json file
-        with open(os.path.join(path, 'json_out.dat'), 'w', encoding = 'utf8') as json_out:
-            json.dump(json_info, json_out, ensure_ascii = False)
+        with open(os.path.join(path, 'json_out.dat'), 'w', encoding='utf8') as json_out:
+            json.dump(json_info, json_out, ensure_ascii=False)
 
         # Plot several figures to monitor the behaviour of the network
         for ex in range(4):
-            self.__plot_test_examples(buffer_pred, test_data, examples = 2).savefig(
+            self.__plot_test_examples(buffer_pred, test_data, examples=2).savefig(
                 os.path.join(path, f'test_example_{ex}.pdf')
             )
 
@@ -209,7 +210,7 @@ class SpectralDataset(torch.utils.data.Dataset):
 
         # Save the information as a json output to further specify the dataset
         with open(os.path.join(output_path, 'info.json'), 'w') as f:
-            json.dump(self.info, f, indent = 4)
+            json.dump(self.info, f, indent=4)
 
     def load_dataset(self, Nb: int, Ns: int, prefix: str = '', suffix: str = '', path: str = './status/dataset') -> None:
         """ Load the dataset from a given path. A prefix and a suffix can be appended to the
@@ -271,7 +272,7 @@ class SpectralDataset(torch.utils.data.Dataset):
         R_temp = self.__data['R'].to('cuda' if use_GPU else 'cpu')
 
         # Calculate the SVD of the spectral function
-        U = torch.linalg.svd(R_temp, full_matrices = False)[2].T[:,:Ns]
+        U = torch.linalg.svd(R_temp, full_matrices=False)[2].T[:,:Ns]
 
         # Delete the uneeded tensor to free up some memory
         del R_temp
@@ -329,8 +330,8 @@ class SpectralDataset(torch.utils.data.Dataset):
         
         # Fill the dictionary with the correct results
         return {
-            'R': self.R[idx,:], 'C': self.C[idx,:], 
-            'L': self.L[idx,:], 'U': self.U
+            'R': self.R[idx, :], 'C': self.C[idx, :], 
+            'L': self.L[idx, :], 'U': self.U
         }
 
     def __plot_test_examples(self, Lp: torch.Tensor, data: dict, examples: int = 2) -> plt.Figure:
@@ -340,7 +341,7 @@ class SpectralDataset(torch.utils.data.Dataset):
         COLORS = ['#283618', '#D62828', '#023E8A', '#EE6C4D']
 
         # Generate the matplotlib figure
-        fig = plt.figure(figsize = (16, 10))
+        fig = plt.figure(figsize=(16, 10))
 
         # Generate two axes in the figure
         axis_L, axis_R = fig.add_subplot(1, 2, 1), fig.add_subplot(1, 2, 2)
@@ -350,8 +351,8 @@ class SpectralDataset(torch.utils.data.Dataset):
         axis_L.set_ylabel(r'$L(n_s)$')
         axis_R.set_xlabel(r'$\omega$')
         axis_R.set_ylabel(r'$\rho(\omega)$')
-        axis_L.grid('#fae1dd', alpha = 0.3)
-        axis_R.grid('#fae1dd', alpha = 0.3)
+        axis_L.grid('#fae1dd', alpha=0.3)
+        axis_R.grid('#fae1dd', alpha=0.3)
 
         # Reconstruct the predicted spectral functions from the coefficients
         Rp = (Lp @ self.U.T)
@@ -366,22 +367,22 @@ class SpectralDataset(torch.utils.data.Dataset):
             pe = int(torch.randint(0, data['L'].shape[0], size = (1,)))
 
             # Get the examples to plot in this round
-            Ll = data['L'][pe,:].detach().numpy()
-            Rl = data['R'][pe,:].detach().numpy()
+            Ll = data['L'][pe, :].detach().numpy()
+            Rl = data['R'][pe, :].detach().numpy()
 
             # Plot the example in the corresponding axes
-            axis_L.plot(torch.arange(0, self.Ns), Ll,       color = COLORS[ex], alpha = 1.0)
-            axis_L.plot(torch.arange(0, self.Ns), Lp[pe,:], color = COLORS[ex], alpha = 0.5)
+            axis_L.plot(torch.arange(0, self.Ns), Ll,        color=COLORS[ex], alpha=1.0)
+            axis_L.plot(torch.arange(0, self.Ns), Lp[pe, :], color=COLORS[ex], alpha=0.5)
 
             # Plot the spectral function in the corresponding axes
-            axis_R.plot(self.kernel.omega, Rl,       color = COLORS[ex], alpha = 1.0)
-            axis_R.plot(self.kernel.omega, Rp[pe,:], color = COLORS[ex], alpha = 0.5)
+            axis_R.plot(self.kernel.omega, Rl,        color=COLORS[ex], alpha=1.0)
+            axis_R.plot(self.kernel.omega, Rp[pe, :], color=COLORS[ex], alpha=0.5)
 
             # Add two rectangles to the handles to show this examples
             handles.append(
                 (
-                    pat.Rectangle((0, 0), 2.0, 1.0, color = COLORS[ex], alpha = 1.0),
-                    pat.Rectangle((0, 0), 2.0, 1.0, color = COLORS[ex], alpha = 0.5)
+                    pat.Rectangle((0, 0), 2.0, 1.0, color=COLORS[ex], alpha=1.0),
+                    pat.Rectangle((0, 0), 2.0, 1.0, color=COLORS[ex], alpha=0.5)
                 )
             )
 
@@ -389,9 +390,9 @@ class SpectralDataset(torch.utils.data.Dataset):
             labels.append(f'Label / Prediction: Example {ex}')
 
         fig.legend(
-            handles, labels, numpoints=1, ncol = examples, frameon = False,
+            handles, labels, numpoints=1, ncol=examples, frameon=False,
             handler_map={tuple: HandlerTuple(ndivide=None)},
-            bbox_to_anchor = (0, 0.95, 1, 0), loc = 'upper center'
+            bbox_to_anchor=(0, 0.95, 1, 0), loc='upper center'
         )
 
         return fig

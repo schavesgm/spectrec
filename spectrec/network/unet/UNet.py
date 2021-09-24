@@ -1,5 +1,7 @@
 # Import some built-in methods
 import os
+from collections import OrderedDict
+from typing import Union
 
 # Import some third party modules
 import torch
@@ -76,6 +78,7 @@ class UNet(nn.Module):
 
         # Apply the fully connected layer if output channels is 1
         if self.Co == 1:
+
             # Do the forward pass on the fully connected
             x = self.fc_out(x.view(x.shape[0], -1))
 
@@ -84,17 +87,17 @@ class UNet(nn.Module):
 
         return x
 
-    def set_params(self, state_dict: str, eliminate_str: str = 'module.') -> None:
+    def set_params(self, state_dict: dict, eliminate_str: str = 'module.') -> None:
         """ Set the parameters of the model using the state_dict provided. """
 
         # Generate a new dictionary to clean the keys
-        clean_state_dict = {}
+        clean_state_dict: dict[str, torch.Tensor] = {}
 
         # Iterate to clean the data
         for key, value in state_dict.items():
             clean_state_dict[key.replace(eliminate_str, '', 1)] = value
         
-        self.load_state_dict(clean_state_dict)
+        self.load_state_dict(OrderedDict(clean_state_dict))
 
     def save_params(self, name: str, path: str = './status/net') -> None:
         """ Save the current status of the network into the given file. """
@@ -105,7 +108,7 @@ class UNet(nn.Module):
         # Save the weights into the path
         torch.save(self.state_dict(), os.path.join(path, name + '.pt'))
 
-    def load_params(self, name: str, path: str = './status/net', device: torch.device = 'cpu', verbose: bool = True) -> None:
+    def load_params(self, name: str, path: str = './status/net', device: Union[torch.device, str] = 'cpu', verbose: bool = True) -> None:
         """ Load the status of a network with given name. """
         
         # Path to the given file

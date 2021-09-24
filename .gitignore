@@ -1,2 +1,5 @@
 # -- Ignore cache files
 __pycache__
+
+# -- Ignore the results inside scripts
+scripts/status

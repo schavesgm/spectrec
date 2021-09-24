@@ -1,0 +1,53 @@
+# -- Template input file
+
+# -- Basic properties of the dataset used
+dataset: {
+    # -- Name used in the dataset. It will 
+    id: {
+      prefix: '',                    # Prefix used in the dataset
+      suffix: '',                    # Suffix used in the dataset
+      location: './status/dataset',  # Location where the dataset is stored
+      overwrite: True,               # Overwrite the dataset
+    },
+    # -- Basis function parameters of the dataset
+    basis: {
+      file: '',                      # File used as basis functions
+      use_GPU: False                  # Use GPU to compute the SVD, only used if file is ''
+    },
+    # -- Parameters of the dataset.
+    basic: {
+        Nb: 100000, 
+        Nt: 64, 
+        Nw: 1000, 
+        Ns: 32, 
+        w_range: [0.0, 8.0],
+    },
+    # -- Peak definitions used in the dataset
+    peaks: {
+        # -- Name of the peak class used and name, use list NameClass(:peak_id)?
+        peak_used:  ['GaussianPeak:test'],
+        max_npeaks: 1,
+        fixed_npeaks: True,
+        limits: {
+            Mtest: [0.3,  3.0],
+            Atest: [0.1,  1.0],
+            Wtest: [0.05, 0.1],
+        },
+    },
+    # -- Kernel used in the dataset
+    kernel: 'NRQCDKernel',
+}
+
+# -- Basic properties of the network used
+network: {
+    # -- Id used to define the current network
+    id: 'test',
+    # -- Proportion of the whole dataset used in the validation step
+    validation_prop: 0.5,
+    # -- Number of epochs used in the training step
+    epochs: 5,
+    # -- Batch size used in the training
+    batch_size: 100,
+    # -- Location where the neural network stuff will be flushed
+    location: './status/net',
+}

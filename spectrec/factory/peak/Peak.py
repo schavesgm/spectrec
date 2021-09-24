@@ -38,7 +38,7 @@ class Peak(metaclass = ABCMeta):
                 self._param_limits[param_name][0], self._param_limits[param_name][1]
             )
 
-    def set_parameter_limit(self, param_name: str, limits: Sequence[float]):
+    def set_parameter_limit(self, param_name: str, limits: list[float]):
         """ Set the limits for the given parameter. Do not forget to recalculate the
         values after setting the new limits
 
@@ -92,6 +92,8 @@ class Peak(metaclass = ABCMeta):
         for possible_name in (particular_name, param_name):
             if possible_name in all_names:
                 return limits[possible_name]
+
+        return []
     # -- }}}
 
     # -- Abstract methods of the base class {{{
@@ -128,7 +130,7 @@ class Peak(metaclass = ABCMeta):
         return self._param_values
 
     @property
-    def limits(self) -> dict[str, Sequence[float]]:
+    def limits(self) -> dict[str, list[float]]:
         """ Return the limits used to define the peak values. """
         return self._param_limits
 

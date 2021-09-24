@@ -2,8 +2,7 @@
 from typing import Union, Sequence, Optional
 from functools import lru_cache
 
-# Some third party modules
-import numpy as np
+# Load some third-party modules
 import torch
 
 # Load the Peak class to be used as interface
@@ -13,8 +12,8 @@ class GaussianPeak(Peak):
     ''' Gaussian peak implementation. '''
 
     # Name of the peak as a string, shared among all instances
-    _peak_type: str        = 'GaussianPeak'
-    _param_ids: tuple[str] = ('M', 'A', 'W')
+    _peak_type: str           = 'GaussianPeak'
+    _param_ids: Sequence[str] = ('M', 'A', 'W')
 
     @lru_cache(maxsize = 2)
     def generate(self, omega: torch.Tensor) -> torch.Tensor:
@@ -52,8 +51,8 @@ class DeltaPeak(Peak):
     ''' Dirac delta peak implemetation. '''
 
     # Name of the peak as a string, shared among all instances
-    _peak_type: str        = 'DeltaPeak'
-    _param_ids: tuple[str] = ('M', 'A')
+    _peak_type: str           = 'DeltaPeak'
+    _param_ids: Sequence[str] = ('M', 'A')
 
     def generate(self, omega: torch.Tensor) -> torch.Tensor:
         ''' Generate a numpy representation of the peak in the energy range. '''
@@ -65,7 +64,7 @@ class DeltaPeak(Peak):
         M_idx = int((self.M - float(omega[0])) * (omega.shape[0] / dw))
 
         # Generate an array of zeros
-        delta = np.zeros(omega.shape[0])
+        delta = torch.zeros(omega.shape[0])
 
         # Change index corresponding to the mass with the correct amplitude
         delta[M_idx] = self.A

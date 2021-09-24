@@ -152,7 +152,7 @@ class SpectralFunction:
             assert self.kernel.kernel.shape == (self.kernel.Nt, self.kernel.Nw)
 
             # Calculate the correlation function
-            self.__data['C'] = self.kernel.kernel * self.compute_R(device, recalculate)
+            self.__data['C'] = self.kernel.kernel.to(device) * self.compute_R(device, recalculate)
 
             # Integrate over the energy space (columns)
             self.__data['C'] = torch.sum(self.__data['C'] * self.kernel.dw, axis = 1)

@@ -15,7 +15,7 @@ class NRQCDKernel(Kernel):
 
     @lru_cache(maxsize = 1)
     def _calculate_kernel(self, Nt: int, Nw: int, w_min: float, w_max: float) -> torch.Tensor:
-        return (- self.tau.view(self.Nt, 1) * self.omega.view(1, self.Nw)).exp()
+        return (- self.tau.view(Nt, 1) * self.omega.view(1, Nw)).exp()
 
 if __name__ == '__main__':
     pass

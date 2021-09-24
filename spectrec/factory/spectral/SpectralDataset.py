@@ -1,14 +1,21 @@
 # -- Load some built-in modules
 from typing import Optional, Sequence
+from collections import namedtuple
 import json, os
 
 # -- Import some third party modules
 import torch
+import matplotlib.pyplot as plt
+import matplotlib.patches as pat
+from matplotlib.legend_handler import HandlerTuple
  
 # -- Import some user-defined modules
-from spectrec.factory import Kernel
-from spectrec.factory import Peak
-from spectrec.factory import SpectralFunction
+from spectrec.factory  import Kernel
+from spectrec.factory  import Peak
+from .SpectralFunction import SpectralFunction
+
+# -- Spectral function output tuple
+SpectralOut = namedtuple('SpectralOut', 'C L')
 
 class SpectralDataset(torch.utils.data.Dataset):
     """ Torch dataset containing spectral functions tranining sets. """
@@ -77,6 +84,93 @@ class SpectralDataset(torch.utils.data.Dataset):
 
         # Get the set of coefficients using the basis functions and the spectral function
         self.__data['L'] = self.__generate_coeffs(use_GPU)
+
+    def clear(self):
+        """ Clear all data in the dataset. Sets the data dictionary as None """
+        del self.__data['R'], self.__data['C'], self.__data['L'], self.__data['U']
+        self.__data = {'R': None, 'C': None, 'U': None, 'L': None}
+
+    def test(
+            self, network: torch.nn.Module, loss: torch.nn.Module, prop: float, device: torch.device, batch_size: int, 
+            prefix: str = '', suffix: str = '', rand: bool = True, path: str = './status/test'
+        ) -> dict:
+
+        # Assert the dataset has been generated
+        assert self.is_generated, 'Dataset cannot be tested as data is not generated.'
+
+        # Number of examples in the test set
+        Nb_test = int(prop * self.Nb)
+
+        # Get the network in evaluation mode. TODO: Check output Confidence Intervals
+        net_test = network.to(device).eval()
+
+        # Select a subset of the data
+        test_data = self.__select_prop(prop, rand)
+
+        # Split the test indices into difference batches
+        batch_idx = torch.split(torch.arange(0, Nb_test), batch_size)
+
+        # Value of the loss function in the test set
+        loss_value = 0.0
+
+        # Buffer containing the predictions of the network
+        buffer_pred = torch.empty((Nb_test, self.Ns), dtype = torch.float32)
+
+        # Calculate the network prediction for each batch
+        for batch in batch_idx:
+            
+            # Get the current batch from the set to test the results
+            C_batch = test_data['C'][batch,:].detach().to(device).log()
+            L_batch = test_data['L'][batch,:].detach().to(device)
+
+            # Generate the correct dimensions of the network
+            C_batch = C_batch.view(C_batch.shape[0], 1, C_batch.shape[1])
+            L_batch = L_batch.view(L_batch.shape[0], 1, L_batch.shape[1])
+
+            # Calculate the prediction of the network
+            L_pred = network(C_batch).detach()
+
+            # Calculate the loss function value
+            loss_value += float(loss(L_pred, L_batch, C_batch).detach())
+
+            # Save the predicted coefficients of the network
+            buffer_pred[batch,:] = L_pred.cpu().view(len(batch), self.Ns)
+
+            # Delete the uneeded tensors
+            del C_batch, L_batch, L_pred
+
+        # Add the prefix and the suffix to the name identifier
+        identifier = f'{prefix}_{self.name}'  if prefix != '' else self.name
+        identifier = f'{identifier}_{suffix}' if suffix != '' else identifier
+
+        # Path where the data will be stored
+        path = os.path.join(path, identifier)
+
+        # Create the folder if it does not exist
+        if not os.path.exists(path): os.makedirs(path)
+
+        # Dictionary containing information to monitor the test_set
+        json_info = self.info | {
+            'test': { 
+                'Nb':   Nb_test,
+                'prop': prop,
+                'loss': float(loss_value / Nb_test),
+                'dL':   float((test_data['L'] - buffer_pred).abs().sum()),
+                'dR':   float((test_data['R'] - buffer_pred @ self.U.T).abs().sum()),
+            },
+        }
+
+        # Dump the information into the json file
+        with open(os.path.join(path, 'json_out.dat'), 'w', encoding = 'utf8') as json_out:
+            json.dump(json_info, json_out, ensure_ascii = False)
+
+        # Plot several figures to monitor the behaviour of the network
+        for ex in range(4):
+            self.__plot_test_examples(buffer_pred, test_data, examples = 2).savefig(
+                os.path.join(path, f'test_example_{ex}.pdf')
+            )
+
+        return json_info
 
     def save_dataset(self, prefix: str = '', suffix: str = '', path: str = './status/dataset') -> None:
         """ Save all the dataset in a given path. A prefix and a suffix can be appended to the
@@ -155,41 +249,6 @@ class SpectralDataset(torch.utils.data.Dataset):
         for tensor_id in ['R', 'C', 'L', 'U']:
             self.__load_tensor(tensor_id, identifier, input_path)
 
-    def load_basis(self, Nb: int, Ns: int, prefix: str = '', suffix: str = '', path: str = './status/dataset'):
-        """ Load a set of basis functions already generated. This method can be used to
-        generate a new dataset using the same basis functions as another already produced
-        dataset.
-
-        --- Parameters:
-        Nb: int
-            Number of examples used in the generation of the basis function file.
-        Ns: int
-            Number of basis functions in the dataset.
-        prefix: str = ''
-            Prefix used in the dataset locator.
-        suffix: str = ''
-            Suffix used in the dataset locator.
-        path: str = './status/dataset'
-            Path where the data is stored.
-        
-        --- Returns:
-        None
-        """
-        # Add the prefix and the suffix to the identifier
-        identifier = self.__generate_identifier(Nb, Ns, prefix, suffix)
-
-        # Output folder where the data shold be stored
-        input_path = os.path.join(path, identifier)
-
-        # Assert the path exists
-        assert os.path.exists(input_path)
-
-        # Assert the dataset to load is correct
-        self.__check_correct_dataset(input_path)
-
-        # Create a path to the current tensor
-        self.__load_tensor('U', identifier, input_path)
-
     # -- Private methods of the class {{{
     def __generate_basis(self, Ns: int, use_GPU: bool) -> torch.Tensor:
         """ Generate the basis functions using the SVD decomposition of the spectral
@@ -255,6 +314,87 @@ class SpectralDataset(torch.utils.data.Dataset):
 
         # Return the CPU allocated version of the basis functions
         return L.cpu()
+
+    def __select_prop(self, prop: float, rand: bool) -> dict[str, torch.Tensor]:
+        """ Select a proportion of the whole dataset randomising it or not. """
+
+        # Number of points to retrieve using perc
+        Nb_prop = int(prop * self.Nb)
+
+        # Indices of each example present in the dataset
+        idx = torch.arange(0, self.Nb)
+
+        # Select some random values or the first Nb results depending on selection
+        idx = torch.randperm(len(idx))[:Nb_prop] if rand else idx[:Nb_prop]
+        
+        # Fill the dictionary with the correct results
+        return {
+            'R': self.R[idx,:], 'C': self.C[idx,:], 
+            'L': self.L[idx,:], 'U': self.U
+        }
+
+    def __plot_test_examples(self, Lp: torch.Tensor, data: dict, examples: int = 2) -> plt.Figure:
+        """ Plot some random examples from the test set into a matplotlib's figure. """
+
+        # Color palette used in the plots
+        COLORS = ['#283618', '#D62828', '#023E8A', '#EE6C4D']
+
+        # Generate the matplotlib figure
+        fig = plt.figure(figsize = (16, 10))
+
+        # Generate two axes in the figure
+        axis_L, axis_R = fig.add_subplot(1, 2, 1), fig.add_subplot(1, 2, 2)
+
+        # Set some properties in each of the axes
+        axis_L.set_xlabel(r'$n_s$')
+        axis_L.set_ylabel(r'$L(n_s)$')
+        axis_R.set_xlabel(r'$\omega$')
+        axis_R.set_ylabel(r'$\rho(\omega)$')
+        axis_L.grid('#fae1dd', alpha = 0.3)
+        axis_R.grid('#fae1dd', alpha = 0.3)
+
+        # Reconstruct the predicted spectral functions from the coefficients
+        Rp = (Lp @ self.U.T)
+
+        # List of handlers and labels to customise the legend
+        handles, labels = [], []
+
+        # Add some lines to the axes
+        for ex in range(examples):
+
+            # Pick a random example from the dataset
+            pe = int(torch.randint(0, data['L'].shape[0], size = (1,)))
+
+            # Get the examples to plot in this round
+            Ll = data['L'][pe,:].detach().numpy()
+            Rl = data['R'][pe,:].detach().numpy()
+
+            # Plot the example in the corresponding axes
+            axis_L.plot(torch.arange(0, self.Ns), Ll,       color = COLORS[ex], alpha = 1.0)
+            axis_L.plot(torch.arange(0, self.Ns), Lp[pe,:], color = COLORS[ex], alpha = 0.5)
+
+            # Plot the spectral function in the corresponding axes
+            axis_R.plot(self.kernel.omega, Rl,       color = COLORS[ex], alpha = 1.0)
+            axis_R.plot(self.kernel.omega, Rp[pe,:], color = COLORS[ex], alpha = 0.5)
+
+            # Add two rectangles to the handles to show this examples
+            handles.append(
+                (
+                    pat.Rectangle((0, 0), 2.0, 1.0, color = COLORS[ex], alpha = 1.0),
+                    pat.Rectangle((0, 0), 2.0, 1.0, color = COLORS[ex], alpha = 0.5)
+                )
+            )
+
+            # Add the label string to the sample
+            labels.append(f'Label / Prediction: Example {ex}')
+
+        fig.legend(
+            handles, labels, numpoints=1, ncol = examples, frameon = False,
+            handler_map={tuple: HandlerTuple(ndivide=None)},
+            bbox_to_anchor = (0, 0.95, 1, 0), loc = 'upper center'
+        )
+
+        return fig
 
     def __load_tensor(self, tensor_id: str, identifier: str, path: str) -> None:
         ''' Load a tensor from the path into data. '''
@@ -327,7 +467,7 @@ class SpectralDataset(torch.utils.data.Dataset):
         C = self.__data['C'].view(self.Nb, 1, self.Nt)
         L = self.__data['L'].view(self.Nb, 1, self.Ns)
 
-        return (C[idx,:,:], L[idx,:,:])
+        return SpectralOut(C[idx,:,:], L[idx,:,:])
 
     def __str__(self) -> str:
         return f'<SpectralSet: {self.name}>' 

@@ -5,9 +5,17 @@ on: [push]
 
 jobs:
 
-  test:
+  ci:
+    # -- Set the strategy and the matrix 
+    strategy:
+      fail-fast: false
+      matrix:
+        poetry-version: [1.1.10]
+
+    # -- Set the platform used to test the data
     runs-on: ubuntu-latest
 
+    # -- Steps of the continuous integration
     steps:
       - name: Check out the code
         uses: actions/checkout@v1

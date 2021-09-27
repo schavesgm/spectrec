@@ -39,7 +39,7 @@ def train_network(
     gd_optimiser = torch.optim.Adam(net_train.parameters())
 
     # Modify the learning rate throughout the training
-    lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(gd_optimiser, gamma = 0.9)
+    lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(gd_optimiser, gamma=0.9)
 
     # Generate the path where the train monitoring data will be stored
     path = os.path.join(path, dataset.name)

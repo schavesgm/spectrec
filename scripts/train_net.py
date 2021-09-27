@@ -7,8 +7,6 @@ import matplotlib.pyplot as plt
 
 # Load some user-defined modules
 from spectrec.factory import SpectralDataset
-from spectrec.factory import NRQCDKernel
-from spectrec.factory import GaussianPeak
 from spectrec.network import UNet
 from spectrec.losses  import MSELoss
 from spectrec.utils   import InputParser
@@ -16,7 +14,7 @@ from spectrec.utils   import train_network
 
 if __name__ == '__main__':
 
-    # Generate a parser object to get the input data
+    # Load a dictionary of input parameters
     input = InputParser('./input.yml').parse_input()
 
     # Get some needed properties of the input
@@ -26,7 +24,7 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Generate a kernel
-    kernel = NRQCDKernel(Nt, Nw, input['w_range'])
+    kernel = input['kernel'](Nt, Nw, input['w_range'])
 
     # Generate a dataset using the input dictionary
     dataset = SpectralDataset(
@@ -45,7 +43,7 @@ if __name__ == '__main__':
     # Generate the dataset path using the location and the name identifier
     dataset_path = os.path.join(input['dataset_loc'], name_id)
 
-    # Basif functions that will be used if basis file is passed
+    # Basis functions that will be used if basis file is passed
     basis = torch.load(input['basis_file']) if input['basis_file'] else None
 
     # Check if the given dataset already exists
@@ -56,13 +54,13 @@ if __name__ == '__main__':
                 print(f'    -- Overwriting dataset using basis: ' + input['basis_file'])
             else:
                 print(f'    -- Overwriting dataset')
-            dataset.generate(Nb, Ns, basis = basis, use_GPU = input['use_GPU'])
+            dataset.generate(Nb, Ns, basis=basis, use_GPU=input['use_GPU'])
         else:
             print(f'    -- Loading dataset')
             dataset.load_dataset(Nb, Ns, prefix, suffix, input['dataset_loc'])
     else:
         print(f' -- Generating {name_id} dataset')
-        dataset.generate(Nb, Ns, basis = basis, use_GPU = input['use_GPU'])
+        dataset.generate(Nb, Ns, basis=basis, use_GPU=input['use_GPU'])
 
     # Generate a network to be used in the training
     net = UNet(Nt, Ns)
@@ -79,11 +77,11 @@ if __name__ == '__main__':
     # Train the network
     train_network(net, dataset, loss, input['epochs'], device, input['batch_size'])
 
-    # Save the network parameter to be used in the future
+    # Save the network parameters to be used in the future
     net.save_params(net_name)
 
-    # Test a portion of the dataset in the test set
-    dataset.test(net, loss, input['validation_prop'], device, batch_size = input['batch_size'])
+    # Test a portion of the dataset using the network
+    dataset.test(net, loss, input['validation_prop'], device, prefix=prefix, suffix=suffix, batch_size=input['batch_size'])
 
     # Save the current dataset
     dataset.save_dataset(prefix, suffix, input['dataset_loc'])

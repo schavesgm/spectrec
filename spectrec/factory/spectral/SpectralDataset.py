@@ -50,6 +50,7 @@ class SpectralDataset(torch.utils.data.Dataset):
         self.__data = {'R': None, 'C': None, 'U': None, 'L': None}
 
     def generate(self, Nb: int, Ns: int, basis: Optional[torch.Tensor] = None, use_GPU: bool = False):
+
         # Assert the number of examples is greater or equal to Nw
         assert Nb >= self.kernel.Nw, f'{Nb = } must be greater than {self.kernel.Nw = }'
 
@@ -398,7 +399,7 @@ class SpectralDataset(torch.utils.data.Dataset):
         return fig
 
     def __load_tensor(self, tensor_id: str, identifier: str, path: str) -> None:
-        ''' Load a tensor from the path into data. '''
+        """ Load a tensor from the path into data. """
 
         # Create a path to the current tensor
         data_path = os.path.join(path, tensor_id + '_' + identifier + '.dat')

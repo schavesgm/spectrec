@@ -9,9 +9,8 @@ import torch
 
 
 class Peak(metaclass=ABCMeta):
-
     def __init__(self, limits: dict[str, Sequence[float]], peak_id: Optional[str] = None):
-        """ Initialise a Peak using **kwargs to pass the limits. """
+        """ Initialise a Peak. """
 
         # -- Dictionaries to hold the parameter values and the limits
         self._param_values, self._param_limits = {}, {}
@@ -38,7 +37,7 @@ class Peak(metaclass=ABCMeta):
                 self._param_limits[param_name][0], self._param_limits[param_name][1]
             )
 
-    def set_parameter_limit(self, param_name: str, limits: list[float]):
+    def set_parameter_limit(self, param_name: str, limits: list[float], recalculate: bool = True):
         """ Set the limits for the given parameter. Do not forget to recalculate the
         values after setting the new limits
 
@@ -55,6 +54,9 @@ class Peak(metaclass=ABCMeta):
 
         # Set the correct limits
         self._param_limits[param_name] = limits
+
+        # Recalculate new parameters in those ranges
+        if recalculate: self.recalculate()
     
     # -- Private methods of the class {{{
     def __select_param_lims(self, limits: dict[str, Sequence[float]], param_name: str, peak_id: Union[str, None]) -> Sequence[float]:

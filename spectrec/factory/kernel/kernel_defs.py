@@ -7,7 +7,6 @@ import torch
 # -- Import user-defined modules
 from .Kernel import Kernel
 
-
 class NRQCDKernel(Kernel):
     """ Non-relativistic QCD kernel definition. """
 

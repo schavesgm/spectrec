@@ -5,7 +5,7 @@ description = "Lattice QCD spectral function reconstruction tools using neural n
 authors = ["Sergio Chaves Garcia-Mascaraque <sergiozteskate@gmail.com>"]
 
 [tool.poetry.dependencies]
-python = "^3.8,<3.11"
+python = "^3.9,<3.11"
 numpy = "^1.21.2"
 torch = "^1.9.0"
 matplotlib = "^3.4.3"

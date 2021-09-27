@@ -46,10 +46,10 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true'
 
       - name: Run pytest
-        run: PYTHONPATH=src/ poetry run python -m pytest -v --cov=src/ tests/
+        run: PYTHONPATH=spectrec/ poetry run python -m pytest -v --cov=spectrec/ tests/
 
       - name: Run pytest coverage
-        run: PYTHONPATH=src/ poetry run python -m coverage report -m;
+        run: PYTHONPATH=spectrec/ poetry run python -m coverage report -m;
 
       - name: Generate XML Report
-        run: PYTHONPATH=src/ poetry run python -m coverage xml
+        run: PYTHONPATH=spectrec/ poetry run python -m coverage xml

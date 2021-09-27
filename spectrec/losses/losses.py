@@ -9,7 +9,7 @@ import torch.nn as nn
 from spectrec.factory import Kernel
 
 class MSELoss(nn.Module):
-    """ 
+    r""" 
         MSE = (Nb)^{-1} \sum_{b=1}^{Nb} \sum_{s=1}^{ns} (y_{bs} - \hat{y}_{bs})^2
     """
 

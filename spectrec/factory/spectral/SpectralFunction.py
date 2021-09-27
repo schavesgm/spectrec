@@ -160,7 +160,8 @@ class SpectralFunction:
 
         return self.__data['C'].to(device)
 
-    def plot_tensor_representation(self) -> plt.Figure:
+    def plot_tensor_representation(self, recalculate: bool = True) -> plt.Figure:
+        """ Plot the spectral function tensor representation. """
 
         # Generate a figure where the data will be plotted
         fig = plt.figure(figsize=(16, 12))
@@ -192,8 +193,8 @@ class SpectralFunction:
         fig.suptitle(title)
 
         # Add the axis to the data
-        axis_R.plot(self.kernel.omega, self.compute_R(), color='#84a98c')
-        axis_C.plot(self.kernel.tau,   self.compute_C(), color='#014f86')
+        axis_R.plot(self.kernel.omega, self.compute_R(recalculate=recalculate), color='#84a98c')
+        axis_C.plot(self.kernel.tau,   self.compute_C(recalculate=recalculate), color='#014f86')
 
         return fig
 

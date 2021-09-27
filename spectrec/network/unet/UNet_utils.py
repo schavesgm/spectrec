@@ -21,10 +21,10 @@ class Stage(nn.Module):
 
         # Generate the module layers
         self.layers = nn.Sequential(
-            nn.Dropout(p), nn.Conv1d(Ci, Co, kernel_size = 3, stride = 1, padding = 0),
-            nn.BatchNorm1d(Cm), nn.LeakyReLU(inplace = True),
-            nn.Dropout(p), nn.Conv1d(Cm, Co, kernel_size = 3, stride = 1, padding = 0),
-            nn.BatchNorm1d(Co), nn.LeakyReLU(inplace = True),
+            nn.Dropout(p), nn.Conv1d(Ci, Co, kernel_size=3, stride=1, padding=0),
+            nn.BatchNorm1d(Cm), nn.LeakyReLU(inplace=True),
+            nn.Dropout(p), nn.Conv1d(Cm, Co, kernel_size=3, stride=1, padding=0),
+            nn.BatchNorm1d(Co), nn.LeakyReLU(inplace=True),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -41,7 +41,7 @@ class DownStage(nn.Module):
 
         # Generate the module layers
         self.layers = nn.Sequential(
-            nn.MaxPool1d(kernel_size = 2, stride = 2, padding = 0),
+            nn.MaxPool1d(kernel_size=2, stride=2, padding=0),
             Stage(in_channels, out_channels, mid_channels, p)
         )
 
@@ -62,8 +62,8 @@ class UpStage(nn.Module):
         # Generate the layer to upsample the data and halve channels
         self.up = nn.Sequential(
             nn.Upsample(mode = 'linear', scale_factor = 2, align_corners = True),
-            nn.Conv1d(in_channels, in_channels // 2, kernel_size = 1),
-            nn.LeakyReLU(inplace = True)
+            nn.Conv1d(in_channels, in_channels // 2, kernel_size=1),
+            nn.LeakyReLU(inplace=True)
         )
 
         # Generate the convolutional stage layer
@@ -102,7 +102,7 @@ class CNNOut(nn.Module):
 
         # Generate the layers of the module
         self.conv = nn.Sequential(
-            nn.Dropout(p), nn.Conv1d(in_channels, out_channels, kernel_size = 1)
+            nn.Dropout(p), nn.Conv1d(in_channels, out_channels, kernel_size=1)
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -119,8 +119,8 @@ class FCOut(nn.Module):
 
         # Generate the layers of the module
         self.fc_out  = nn.Sequential(
-            nn.Dropout(p), nn.Linear(input_size, 256), nn.LeakyReLU(inplace = True),
-            nn.Dropout(p), nn.Linear(256, 128), nn.LeakyReLU(inplace = True),
+            nn.Dropout(p), nn.Linear(input_size, 256), nn.LeakyReLU(inplace=True),
+            nn.Dropout(p), nn.Linear(256, 128), nn.LeakyReLU(inplace=True),
             nn.Dropout(p), nn.Linear(128, output_size)
         )
 

@@ -6,10 +6,7 @@ from functools import lru_cache
 # -- Import third party modules
 import torch
 
-
 class Kernel(metaclass = ABCMeta):
-
-
     def __init__(self, Nt: int, Nw: int, w_range: Sequence[float]):
         # The energy range should be a two dimensional object
         assert len(w_range) == 2, f'{w_range =} must be a 2-dimensional object.'

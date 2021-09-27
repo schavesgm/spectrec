@@ -32,7 +32,7 @@ class UNet(nn.Module):
         # Amplify the data using a linear layer if needed
         if self.Li < 572:
             self.pre_amplify = nn.Sequential(
-                nn.Linear(input_size, 572, bias = False), nn.ReLU(inplace = True)
+                nn.Linear(input_size, 572, bias=False), nn.ReLU(inplace=True)
             )
 
         # Generate the network architecture

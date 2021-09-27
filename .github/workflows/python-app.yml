@@ -26,7 +26,6 @@ jobs:
     - name: Install poetry
       with:
         python-version: 3.9
-      with:
         path: ~/.cache/pypoetry/virtualenvs
         key: ${{ runner.os }}-poetry-${{ hashFiles('poetry.lock') }}
       run: poetry --version

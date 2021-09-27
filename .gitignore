@@ -3,3 +3,10 @@ __pycache__
 
 # -- Ignore the results inside scripts
 scripts/status
+
+# -- Ignore python environment folders
+bin
+include
+lib
+lib64
+pyvenv.cfg

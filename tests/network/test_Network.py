@@ -9,8 +9,14 @@ import pytest
 # Load some user-defined modules
 from spectrec.network import UNet
 
-class TestUNet:
 
+@pytest.fixture(scope="session")
+def output_path():
+    return './status/network'
+
+
+class TestNetwork:
+    """ Test the Network base class using UNet as interface. """
 
     def test_setparams_cpu(self):
         """ Test the correctness of the parameter copy. """
@@ -45,20 +51,20 @@ class TestUNet:
         for w1, w2 in zip(net1.state_dict().values(), net2.state_dict().values()):
             assert torch.all(torch.eq(w1, w2.cpu()))
 
-    def test_IO(self):
+    def test_IO(self, output_path):
         """ Test the networks ability to save/load parameters. """
 
         # Generate a neural network object
         net = UNet(64, 20)
 
         # Save the parameters of the network into a file
-        net.save_params('test')
+        net.save_params('test', path=output_path)
 
         # Assert the file exists
-        assert os.path.exists('./status/net/test.pt')
+        assert os.path.exists(f'{output_path}/UNet/test.pt')
 
         # Assert that we can load the parameters from the file
-        net.load_params('test', verbose=False)
+        net.load_params('test', path=output_path, verbose=False)
 
         # Delete the newly created folder
         shutil.rmtree('./status')

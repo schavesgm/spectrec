@@ -1,2 +1,5 @@
-# Import the UNet class as a whole
-from .unet import UNet
+# Import the Network base class
+from .Network import Network
+
+# Import the UNet implementation
+from .UNet import UNet

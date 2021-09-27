@@ -1,7 +1,5 @@
 # Import some built-in methods
 import os
-from collections import OrderedDict
-from typing import Union
 
 # Import some third party modules
 import torch
@@ -9,14 +7,19 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 # Import some user defined modules
+from .Network import Network
 from .UNet_utils import Stage
 from .UNet_utils import DownStage
 from .UNet_utils import UpStage
 from .UNet_utils import CNNOut
 from .UNet_utils import FCOut
 
-class UNet(nn.Module):
+
+class UNet(Network):
     """ One dimensional convolutional neural network. """
+
+    # -- Identifier of the network
+    _net_id: str = 'UNet'
 
     def __init__(self, input_size: int, output_size: int, in_channels: int = 1, out_channels: int = 1, p: float = 0.0):
         
@@ -78,58 +81,11 @@ class UNet(nn.Module):
 
         # Apply the fully connected layer if output channels is 1
         if self.Co == 1:
-
-            # Do the forward pass on the fully connected
             x = self.fc_out(x.view(x.shape[0], -1))
-
-            # Transform the fully connected to (Nb, 1, Ns)
             x = x.view(x.shape[0], 1, x.shape[1])
 
         return x
 
-    def set_params(self, state_dict: dict, eliminate_str: str = 'module.') -> None:
-        """ Set the parameters of the model using the state_dict provided. """
-
-        # Generate a new dictionary to clean the keys
-        clean_state_dict: dict[str, torch.Tensor] = {}
-
-        # Iterate to clean the data
-        for key, value in state_dict.items():
-            clean_state_dict[key.replace(eliminate_str, '', 1)] = value
-        
-        self.load_state_dict(OrderedDict(clean_state_dict))
-
-    def save_params(self, name: str, path: str = './status/net') -> None:
-        """ Save the current status of the network into the given file. """
-
-        # Check if the path exists
-        if not os.path.exists(path): os.makedirs(path)
-
-        # Save the weights into the path
-        torch.save(self.state_dict(), os.path.join(path, name + '.pt'))
-
-    def load_params(self, name: str, path: str = './status/net', device: Union[torch.device, str] = 'cpu', verbose: bool = True) -> None:
-        """ Load the status of a network with given name. """
-        
-        # Path to the given file
-        path = os.path.join(path, name + '.pt')
-
-        try:
-            # Load the parameters
-            self.load_state_dict(torch.load(path, map_location = device))
-
-            # Evaluate the parameters in the model
-            self.eval()
-
-            if verbose: print(f'Loaded {name} UNet instance', flush = True)
-
-        except FileNotFoundError:
-            if verbose: print(f'Network with name {name} not found. New instance', flush = True)
-
-    @property
-    def num_weights(self) -> int:
-        """ Show the total number of learnable parameters. """
-        return sum(p.numel() for p in self.parameters())
 
 if __name__ == '__main__':
     pass

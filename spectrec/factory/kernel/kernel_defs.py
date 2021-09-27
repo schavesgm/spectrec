@@ -17,9 +17,6 @@ class NRQCDKernel(Kernel):
     def _calculate_kernel(self, Nt: int, Nw: int, w_min: float, w_max: float) -> torch.Tensor:
         return (- self.tau.view(Nt, 1) * self.omega.view(1, Nw)).exp()
 
-    def test_this_with_actions(self):
-        return 'This should pass all tests'
-
 
 if __name__ == '__main__':
     pass

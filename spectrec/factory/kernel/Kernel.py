@@ -40,7 +40,6 @@ class Kernel(metaclass = ABCMeta):
     @abstractmethod
     def _calculate_kernel(self, Nt: int, Nw: int, w_min: float, w_max: float) -> torch.Tensor:
         """ Return the kernel as a torch tensor. """
-        return
     # -- }}}
 
     # -- Property methods of the class {{{

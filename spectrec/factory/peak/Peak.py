@@ -10,7 +10,6 @@ import torch
 
 class Peak(metaclass=ABCMeta):
 
-
     def __init__(self, limits: dict[str, Sequence[float]], peak_id: Optional[str] = None):
         """ Initialise a Peak using **kwargs to pass the limits. """
 
@@ -101,7 +100,6 @@ class Peak(metaclass=ABCMeta):
     @abstractmethod
     def generate(self, omega: torch.Tensor) -> torch.Tensor:
         """ Generate a torch representation of the peak in the given energy range. """
-        return
     # -- }}}
 
     # -- Abstract properties of the base class {{{
@@ -110,7 +108,6 @@ class Peak(metaclass=ABCMeta):
         """ Names of the parameters used in the class. For example, [A, M, W] in a Gaussian
         peak with parameters: amplitude (A), mass (M) and width (W).
         """
-        return
     # -- }}}
 
     # -- Magic methods of the class {{{

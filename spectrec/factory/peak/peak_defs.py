@@ -56,6 +56,7 @@ class DeltaPeak(Peak):
     _peak_type: str           = 'DeltaPeak'
     _param_ids: Sequence[str] = ('M', 'A')
 
+    @lru_cache(maxsize=2)
     def generate(self, omega: torch.Tensor) -> torch.Tensor:
         """ Generate a numpy representation of the peak in the energy range. """
 

@@ -1,53 +1,56 @@
 # -- Template input file
 
-# -- Basic properties of the dataset used
+# Path where the monitoring and output data will be stored
+output_path: './status'
+
+# Basic properties of the dataset used
 dataset: {
-    # -- Name used in the dataset. It will 
+    # Identifiers of the dataset
     id: {
-      prefix: '',                    # Prefix used in the dataset
-      suffix: '',                    # Suffix used in the dataset
-      location: './status/dataset',  # Location where the dataset is stored
-      overwrite: True,               # Overwrite the dataset
+      prefix: '',
+      suffix: '',
     },
-    # -- Basis function parameters of the dataset
-    basis: {
-      file: '',                      # File used as basis functions
-      use_GPU: False                  # Use GPU to compute the SVD, only used if file is ''
-    },
-    # -- Parameters of the dataset.
-    basic: {
-        Nb: 100000, 
+    # Basic parameters of the dataset
+    parameters: {
+        Nb: 2000, 
         Nt: 64, 
         Nw: 1000, 
         Ns: 32, 
         w_range: [0.0, 8.0],
     },
-    # -- Peak definitions used in the dataset
-    peaks: {
-        # -- Name of the peak class used and name, use list NameClass(:peak_id)?
-        peak_used:  ['GaussianPeak:test'],
-        max_npeaks: 1,
-        fixed_npeaks: True,
-        limits: {
-            Mtest: [0.3,  3.0],
-            Atest: [0.1,  1.0],
-            Wtest: [0.05, 0.1],
-        },
+    # Generation information of the dataset
+    generation: {
+      # Overwrite the dataset if it already existst
+      overwrite: False,
+      # File to be used as basis functions; '' means new generation of basis functions
+      basis: '',
+      # Use the GPU in the computation of the basis functions
+      use_GPU: True,
     },
-    # -- Kernel used in the dataset
+    # Peaks used in the dataset
+    peaks: {
+      # Peak class and identifier; use classname(:\w+)?. Classes need to be registered
+      peaks_used:  ['GaussianPeak:test'],
+      max_np: 1,
+      fixed_np: True,
+      limits: {
+          Mtest: [0.3,  3.0],
+          Atest: [0.1,  1.0],
+          Wtest: [0.05, 0.1],
+      },
+    },
+    # Kernel used in the dataset; kernel needs to be registered.
     kernel: 'NRQCDKernel',
 }
 
 # -- Basic properties of the network used
 network: {
-    # -- Id used to define the current network
-    id: 'test',
-    # -- Proportion of the whole dataset used in the validation step
-    validation_prop: 0.5,
-    # -- Number of epochs used in the training step
-    epochs: 5,
-    # -- Batch size used in the training
+    # Prefix used to further specify a network
+    prefix: 'test',
+    # Proportion of the whole dataset used in the validation step
+    val_prop: 0.5,
+    # Number of epochs used in the training step
+    epochs: 2,
+    # Batch size used in the training
     batch_size: 100,
-    # -- Location where the neural network stuff will be flushed
-    location: './status/net',
 }

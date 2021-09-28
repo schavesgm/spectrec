@@ -155,7 +155,7 @@ class SpectralDataset(torch.utils.data.Dataset):
         # Create the folder if it does not exist
         if not os.path.exists(path): os.makedirs(path)
 
-        # Dictionary containing information to monitor the test_set TODO: Change
+        # Dictionary containing information to monitor the test_set
         json_info = self.info | {
             'test': {
                 'Nb':   Nb_test,
@@ -343,7 +343,7 @@ class SpectralDataset(torch.utils.data.Dataset):
         """ Plot some random examples from the test set into a matplotlib's figure. """
 
         # Color palette used in the plots
-        COLORS = ['#168AAD', '#D62828', '#023E8A', '#EE6C4D']
+        COLORS = ['#168AAD', '#D00000', '#2D6A4F', '#5A189A']
 
         # Generate the matplotlib figure
         fig = plt.figure(figsize=(16, 10))
@@ -375,7 +375,8 @@ class SpectralDataset(torch.utils.data.Dataset):
             Ll = data['L'][pe, :].detach().numpy()
             Rl = data['R'][pe, :].detach().numpy()
 
-            # Plot the example in the corresponding axes. TODO: Change this to candlesticks
+            # Plot the example in the corresponding axes. 
+            # -- TODO: Change this to candlestick plots
             axis_L.plot(torch.arange(0, self.Ns), Ll,        color=COLORS[ex], linestyle='-',  alpha=1.0)
             axis_L.plot(torch.arange(0, self.Ns), Lp[pe, :], color=COLORS[ex], linestyle='-.', alpha=0.5)
 
@@ -385,7 +386,7 @@ class SpectralDataset(torch.utils.data.Dataset):
 
             # Add two rectangles to the handles to show this examples
             handles.append(
-                (
+                tuple(
                     pat.Rectangle((0, 0), 2.0, 1.0, color=COLORS[ex], alpha=1.0),
                     pat.Rectangle((0, 0), 2.0, 1.0, color=COLORS[ex], alpha=0.5)
                 )
@@ -394,6 +395,7 @@ class SpectralDataset(torch.utils.data.Dataset):
             # Add the label string to the sample
             labels.append(f'Label / Prediction: Example {ex}')
 
+        # Add a legend to the figure
         fig.legend(
             handles, labels, numpoints=1, ncol=examples, frameon=False,
             handler_map={tuple: HandlerTuple(ndivide=None)},
@@ -415,7 +417,8 @@ class SpectralDataset(torch.utils.data.Dataset):
         self.__data[tensor_id] = torch.load(data_path)
 
     def __generate_identifier(self, Nb: int, Ns: int, prefix: str, suffix: str):
-        """ Generate a identifier name using some parameters. """
+        """ Generate a name identifier using some parameters. """
+
         # Add the prefix and the suffix to the name identifier
         prefix = f'{prefix}_' if prefix != '' else ''
         suffix = f'_{suffix}' if suffix != '' else ''

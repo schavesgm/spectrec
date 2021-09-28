@@ -2,8 +2,8 @@
 import os, re, yaml
 
 # Factory functions to instantiate kernel and peak classes
-from .PKFactory import create_kernel_class
-from .PKFactory import create_peak_class
+from .PKFactory import retrieve_kernel_class
+from .PKFactory import retrieve_peak_class
 
 class InputParser:
     """ Class to parse an input file to obtain all needed input parameters. """
@@ -41,7 +41,7 @@ class InputParser:
             matches = re.match(r'(\w+):?(.*)', peak)
 
             # Get the peak class to be used
-            peak_typ.append(create_peak_class(matches.group(1)))
+            peak_typ.append(retrieve_peak_class(matches.group(1)))
             peak_ids.append(matches.group(2))
 
         # Get None instead of '' in the peak_ids
@@ -64,7 +64,7 @@ class InputParser:
             'peak_limits': dataset['peaks']['limits'],
             'max_np':      dataset['peaks']['max_np'],
             'fixed_np':    dataset['peaks']['fixed_np'],
-            'kernel':      create_kernel_class(dataset['kernel'])
+            'kernel':      retrieve_kernel_class(dataset['kernel'])
         }
 
     def parse_network(self) -> dict:

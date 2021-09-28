@@ -42,7 +42,6 @@ class Network(nn.Module):
 
         # Path to the given file
         load_path = os.path.join(path, self._net_id, f'{identifier}.pt')
-        print(load_path)
 
         # Try loading the parameters
         try:

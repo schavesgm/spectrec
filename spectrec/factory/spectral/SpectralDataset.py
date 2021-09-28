@@ -93,12 +93,16 @@ class SpectralDataset(torch.utils.data.Dataset):
         self.__data = {'R': None, 'C': None, 'U': None, 'L': None}
 
     def test(
-        self, network: torch.nn.Module, loss: torch.nn.Module, prop: float, device: torch.device, batch_size: int, 
-        prefix: str = '', suffix: str = '', rand: bool = True, path: str = './status/test'
+        self, network: torch.nn.Module, loss: torch.nn.Module, prop: float, device: torch.device, 
+        batch_size: int, val_or_test: str, prefix: str = '', suffix: str = '', rand: bool = True, 
+        path: str = './status/monitor'
     ) -> dict:
 
         # Assert the dataset has been generated
         assert self.is_generated, 'Dataset cannot be tested as data is not generated.'
+
+        # Assert val_or_test is either val or test
+        assert val_or_test in ['val', 'test'], '{val_or_test = } must be in [val, test]'
 
         # Number of examples in the test set
         Nb_test = int(prop * self.Nb)
@@ -146,7 +150,7 @@ class SpectralDataset(torch.utils.data.Dataset):
         identifier = f'{identifier}_{suffix}' if suffix != '' else identifier
 
         # Path where the data will be stored
-        path = os.path.join(path, identifier)
+        path = os.path.join(path, identifier, val_or_test)
 
         # Create the folder if it does not exist
         if not os.path.exists(path): os.makedirs(path)
@@ -372,12 +376,12 @@ class SpectralDataset(torch.utils.data.Dataset):
             Rl = data['R'][pe, :].detach().numpy()
 
             # Plot the example in the corresponding axes
-            axis_L.plot(torch.arange(0, self.Ns), Ll,        color=COLORS[ex], alpha=1.0)
-            axis_L.plot(torch.arange(0, self.Ns), Lp[pe, :], color=COLORS[ex], alpha=0.5)
+            axis_L.plot(torch.arange(0, self.Ns), Ll,        color=COLORS[ex], linestyle='-',  alpha=1.0)
+            axis_L.plot(torch.arange(0, self.Ns), Lp[pe, :], color=COLORS[ex], linestyle='-.', alpha=0.5)
 
             # Plot the spectral function in the corresponding axes
-            axis_R.plot(self.kernel.omega, Rl,        color=COLORS[ex], alpha=1.0)
-            axis_R.plot(self.kernel.omega, Rp[pe, :], color=COLORS[ex], alpha=0.5)
+            axis_R.plot(self.kernel.omega, Rl,        color=COLORS[ex], linestyle='-',  alpha=1.0)
+            axis_R.plot(self.kernel.omega, Rp[pe, :], color=COLORS[ex], linestyle='-.', alpha=0.5)
 
             # Add two rectangles to the handles to show this examples
             handles.append(

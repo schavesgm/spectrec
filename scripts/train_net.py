@@ -98,7 +98,7 @@ if __name__ == '__main__':
     loss = MSELoss()
 
     # Monitor path
-    monitor_path = os.path.join(input_info['output'], 'monitor', net_name)
+    monitor_path = os.path.join(input_info['output'], 'monitor', net.net_id, net_name)
 
     # Train the network
     train_network(

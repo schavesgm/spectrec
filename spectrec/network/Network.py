@@ -65,6 +65,11 @@ class Network(nn.Module):
         """ Show the total number of learnable parameters. """
         return sum(p.numel() for p in self.parameters())
 
+    @property
+    def net_id(self) -> str:
+        """ Retrieve the network id. """
+        return self._net_id
+
 
 if __name__ == '__main__':
     pass

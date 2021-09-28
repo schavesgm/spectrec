@@ -1,7 +1,7 @@
 # -- Load some built-in modules
 from typing import Optional, Sequence
 from collections import namedtuple
-import json, os
+import json, os, datetime
 
 # -- Import some third party modules
 import torch
@@ -155,7 +155,7 @@ class SpectralDataset(torch.utils.data.Dataset):
         # Create the folder if it does not exist
         if not os.path.exists(path): os.makedirs(path)
 
-        # Dictionary containing information to monitor the test_set
+        # Dictionary containing information to monitor the test_set TODO: Change
         json_info = self.info | {
             'test': {
                 'Nb':   Nb_test,
@@ -168,7 +168,7 @@ class SpectralDataset(torch.utils.data.Dataset):
 
         # Dump the information into the json file
         with open(os.path.join(path, 'json_out.dat'), 'w', encoding='utf8') as json_out:
-            json.dump(json_info, json_out, ensure_ascii=False)
+            json.dump(json_info, json_out, ensure_ascii=False, indent=4)
 
         # Plot several figures to monitor the behaviour of the network
         for ex in range(4):
@@ -517,6 +517,7 @@ class SpectralDataset(torch.utils.data.Dataset):
     def info(self) -> dict:
         return {
             'name':         self.name,
+            'date':         str(datetime.date.today()),
             'is_generated': self.is_generated,
             'Nb':           self.Nb,
             'Nt':           self.Nt,

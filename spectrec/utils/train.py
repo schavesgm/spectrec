@@ -9,9 +9,10 @@ import matplotlib.pyplot as plt
 from spectrec.factory import SpectralDataset
 from .plots import eliminate_mirror_axis
 
+
 def train_network(
     network: torch.nn.Module, dataset: SpectralDataset, loss: torch.nn.Module, 
-    epochs: int, device: torch.device, batch_size: int, path: str = './status/monitor/train'
+    epochs: int, device: torch.device, batch_size: int, path: str = './status/monitor'
     ):
     """ Train a neural network module in a given dataset using a loss function.
 
@@ -19,7 +20,7 @@ def train_network(
     network: torch.nn.Module
         Neural network to be trained.
     dataset: SpectralDataset
-        Spectral function dataset used in the training. 
+        Spectral function dataset used in the training.
     loss: torch.nn.Module
         Loss function used in the training.
     epochs: int
@@ -41,14 +42,14 @@ def train_network(
     # Modify the learning rate throughout the training
     lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(gd_optimiser, gamma=0.9)
 
-    # Generate the path where the train monitoring data will be stored
-    path = os.path.join(path, dataset.name)
+    # Path where the output data will be stored
+    output_path = os.path.join(path, dataset.name, 'train')
 
     # If the path is not created, then create a directory
-    if not os.path.exists(path): os.makedirs(path)
+    if not os.path.exists(output_path): os.makedirs(output_path)
 
     # Create a buffer where the data will be flushed
-    stream_out = open(os.path.join(path, 'monitor.dat'), 'w')
+    stream_out = open(os.path.join(output_path, 'monitor.dat'), 'w')
 
     # List where the monitoring data will be plotted
     loss_values, loss_indices = [], []
@@ -57,9 +58,7 @@ def train_network(
     for epoch in range(epochs):
 
         # Create a DataLoader object to be used in the training
-        train_loader = torch.utils.data.DataLoader(
-            dataset, batch_size = batch_size, shuffle = True
-        )
+        train_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
         for b, pair in enumerate(train_loader):
 
@@ -83,9 +82,8 @@ def train_network(
             
             # Flush some data into the stream every few iterations
             if b % 20 == 0:
-                # Flush some data to a file and the console
                 stream_out.write(f'{epoch} {b} {float(loss_value)}\n')
-                print(epoch, b, loss_value, flush = True)
+                print(epoch, b, loss_value, flush=True)
 
                 # Append some data to the lists to generate some plots
                 loss_values.append(float(loss_value))
@@ -101,7 +99,7 @@ def train_network(
     stream_out.close()
 
     # Generate a figure to plot the data
-    fig = plt.figure(figsize = (16, 10))
+    fig = plt.figure(figsize=(16, 10))
 
     # Add an axes to the figure
     axis = fig.add_subplot(1, 1, 1)
@@ -113,16 +111,17 @@ def train_network(
     axis.set_facecolor('#fcfcfc')
 
     # Plot the data
-    axis.plot(loss_indices, loss_values, color = '#eb5e28')
+    axis.plot(loss_indices, loss_values, color='#eb5e28')
 
     # Eliminate the mirror axis from the figure
     eliminate_mirror_axis(axis)
 
     # Save the figure
-    fig.savefig(os.path.join(path, 'train_loss.pdf'))
+    fig.savefig(os.path.join(output_path, 'train_loss.pdf'))
 
     # Set the parameters in the non-parallel network
     network.set_params(net_train.state_dict())
+
 
 if __name__ == '__main__':
     pass

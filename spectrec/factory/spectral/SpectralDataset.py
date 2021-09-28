@@ -161,8 +161,8 @@ class SpectralDataset(torch.utils.data.Dataset):
                 'Nb':   Nb_test,
                 'prop': prop,
                 'loss': float(loss_value / Nb_test),
-                'dL':   float((test_data['L'] - buffer_pred).abs().sum()),
-                'dR':   float((test_data['R'] - buffer_pred @ self.U.T).abs().sum()),
+                'dL':   float(torch.sum((test_data['L'] - buffer_pred) ** 2, axis=1).mean()),
+                'dR':   float((test_data['R'] - buffer_pred @ self.U.T).abs().max(axis=1).values.mean()),
             },
         }
 
@@ -172,7 +172,7 @@ class SpectralDataset(torch.utils.data.Dataset):
 
         # Plot several figures to monitor the behaviour of the network
         for ex in range(4):
-            self.__plot_test_examples(buffer_pred, test_data, examples=2).savefig(
+            self.__plot_test_examples(buffer_pred, test_data, examples=1).savefig(
                 os.path.join(path, f'test_example_{ex}.pdf')
             )
 
@@ -339,11 +339,11 @@ class SpectralDataset(torch.utils.data.Dataset):
             'L': self.L[idx, :], 'U': self.U
         }
 
-    def __plot_test_examples(self, Lp: torch.Tensor, data: dict, examples: int = 2) -> plt.Figure:
+    def __plot_test_examples(self, Lp: torch.Tensor, data: dict, examples: int = 1) -> plt.Figure:
         """ Plot some random examples from the test set into a matplotlib's figure. """
 
         # Color palette used in the plots
-        COLORS = ['#283618', '#D62828', '#023E8A', '#EE6C4D']
+        COLORS = ['#168AAD', '#D62828', '#023E8A', '#EE6C4D']
 
         # Generate the matplotlib figure
         fig = plt.figure(figsize=(16, 10))
@@ -375,7 +375,7 @@ class SpectralDataset(torch.utils.data.Dataset):
             Ll = data['L'][pe, :].detach().numpy()
             Rl = data['R'][pe, :].detach().numpy()
 
-            # Plot the example in the corresponding axes
+            # Plot the example in the corresponding axes. TODO: Change this to candlesticks
             axis_L.plot(torch.arange(0, self.Ns), Ll,        color=COLORS[ex], linestyle='-',  alpha=1.0)
             axis_L.plot(torch.arange(0, self.Ns), Lp[pe, :], color=COLORS[ex], linestyle='-.', alpha=0.5)
 

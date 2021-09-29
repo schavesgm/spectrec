@@ -348,22 +348,29 @@ class SpectralDataset(torch.utils.data.Dataset):
         # Generate the matplotlib figure
         fig = plt.figure(figsize=(16, 10))
 
-        # Generate two axes in the figure
-        axis_L, axis_R = fig.add_subplot(1, 2, 1), fig.add_subplot(1, 2, 2)
+        # Generate three (2 left 1 right) axes in the figure
+        axis_L1, axis_L2 = fig.add_subplot(2, 2, 1), fig.add_subplot(2, 2, 3)
+        axis_R           = fig.add_subplot(1, 2, 2)
 
         # Set some properties in each of the axes
-        axis_L.set_xlabel(r'$n_s$')
-        axis_L.set_ylabel(r'$L(n_s)$')
+        axis_L1.set_xlabel(r'$n_s$')
+        axis_L1.set_ylabel(r'$L(n_s)$')
+        axis_L2.set_xlabel(r'$n_s$')
+        axis_L2.set_ylabel(r'$|(\hat{L}(n_s) - L(n_s))/L(n_s)|$')
         axis_R.set_xlabel(r'$\omega$')
         axis_R.set_ylabel(r'$\rho(\omega)$')
-        axis_L.grid('#fae1dd', alpha=0.3)
+        axis_L1.grid('#fae1dd', alpha=0.3)
+        axis_L2.grid('#fae1dd', alpha=0.3)
         axis_R.grid('#fae1dd', alpha=0.3)
 
         # Reconstruct the predicted spectral functions from the coefficients
         Rp = (Lp @ self.U.T)
 
-        # List of handlers and labels to customise the legend
-        handles, labels = [], []
+        #List of handlers and labels to customise the legend 
+        handles, labels = [], [] 
+
+        # ns values to use in the plots
+        ns_vals = torch.arange(0, self.Ns)
 
         # Add some lines to the axes
         for ex in range(examples):
@@ -375,13 +382,30 @@ class SpectralDataset(torch.utils.data.Dataset):
             Ll = data['L'][pe, :].detach().numpy()
             Rl = data['R'][pe, :].detach().numpy()
 
-            # Plot the example in the corresponding axes. TODO: Change this to candlesticks
-            axis_L.plot(torch.arange(0, self.Ns), Ll,        color=COLORS[ex], linestyle='-',  alpha=1.0)
-            axis_L.plot(torch.arange(0, self.Ns), Lp[pe, :], color=COLORS[ex], linestyle='-.', alpha=0.5)
+            # Plot the coefficients side-by-side.
+            axis_L1.bar(ns_vals,       Ll,         color=COLORS[ex], alpha=1.0, width=0.2)
+            axis_L1.bar(ns_vals + 0.2, Lp[pe, :],  color=COLORS[ex], alpha=0.5, width=0.2)
+
+            # Ll numpy to torch
+            Ll_torch = torch.from_numpy(Ll)
+
+            # Calculate difference between labels and predictions of coefficients
+            delta_L = Ll_torch - Lp[pe, :]
+
+            # Create color list, blue for positive, red for negative
+            cc=['colors']*len(delta_L)
+            for n,val in enumerate(delta_L):
+                if val>0:
+                    cc[n]='#b80000'
+                elif val<=0:
+                    cc[n]='#168AAD'
+
+            # Plot the absolute difference between coefficients.
+            axis_L2.bar(ns_vals, torch.abs((Ll_torch - Lp[pe, :])/Ll_torch), color=cc, alpha=0.7, width=0.2)
 
             # Plot the spectral function in the corresponding axes
-            axis_R.plot(self.kernel.omega, Rl,        color=COLORS[ex], linestyle='-',  alpha=1.0)
-            axis_R.plot(self.kernel.omega, Rp[pe, :], color=COLORS[ex], linestyle='-.', alpha=0.5)
+            axis_R.plot(self.kernel.omega, Rl,        color=COLORS[ex], linestyle='-', alpha=1.0)
+            axis_R.plot(self.kernel.omega, Rp[pe, :], color=COLORS[ex], linestyle='--', alpha=0.5)
 
             # Add two rectangles to the handles to show this examples
             handles.append(

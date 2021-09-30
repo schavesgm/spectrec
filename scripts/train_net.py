@@ -33,7 +33,7 @@ if __name__ == '__main__':
     register_kernel_class('NRQCDKernel', NRQCDKernel)
 
     # Load a dictionary of input parameters
-    input_info = InputParser('./input.yml').parse_input()
+    input_info = InputParser('./template.yml').parse_input()
 
     # Get the information related to the dataset and network
     dataset_info, network_info = input_info['dataset'], input_info['network']

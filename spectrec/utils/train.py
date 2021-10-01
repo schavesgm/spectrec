@@ -4,124 +4,294 @@ import os
 # Load some third-party modules
 import torch
 import matplotlib.pyplot as plt
+import matplotlib.patches as pat
+from matplotlib.legend_handler import HandlerTuple
+from torch.utils.tensorboard import SummaryWriter
 
 # Load some user-defined modules
 from spectrec.factory import SpectralDataset
+from spectrec.network import Network
+
+# Load some utility modules
 from .plots import eliminate_mirror_axis
 
+# Color used in the example plots
+COLOR_1, COLOR_2, COLOR_3 = '#1E6091', '#40916C', '#BA181B'
 
+def plot_validate_example(
+        Ll: torch.Tensor, Lp: torch.Tensor, Rl: torch.Tensor, Rp: torch.Tensor, omega: torch.Tensor, ne: int, ex: int = 0
+    ) -> plt.Figure:
+    """ Plot a random validation example to monitor the spectral reconstruction. The output
+    contains a figure with three different axis: one comparing label and predicted coefficients,
+    one comparing the absolute difference between labels and coefficients and the last one comparing
+    the label and predicted spectral functions.
+
+    --- Parameters:
+    Ll: torch.Tensor
+        Label coefficients.
+    Lp: torch.Tensor
+        Predicted coefficients.
+    Rl: torch.Tensor
+        Label spectral functions.
+    Rp: torch.Tensor
+        Predicted spectral functions.
+    omega: torch.Tensor
+        Omega values to make the spectral function plot prettier.
+    ne: int
+        Number to write on the label to make the plots different. Tensorboard hack.
+    ex: int
+        Example to be plotted from the data
+
+    --- Returns:
+    plt.Figure
+        Matplotlib figure containing the plots.
+    """
+
+    # Generate the matplotlib figure
+    fig = plt.figure(figsize=(16, 12))
+
+    # Generate three (2 left 1 right) axis in the figure
+    axis_L1 = fig.add_subplot(2, 2, 1)
+    axis_L2 = fig.add_subplot(2, 2, 3)
+    axis_R  = fig.add_subplot(1, 2, 2)
+
+    # Set some properties in each of the axes
+    axis_L1.set_xlabel(r'$n_s$')
+    axis_L1.set_ylabel(r'$L(n_s)$')
+    axis_L2.set_xlabel(r'$n_s$')
+    axis_L2.set_ylabel(r'$|(\hat{L}(n_s) - L(n_s))|$')
+    axis_R.set_xlabel(r'$\omega$')
+    axis_R.set_ylabel(r'$\rho(\omega)$')
+    axis_L1.grid('#fae1dd', alpha=0.3)
+    axis_L2.grid('#fae1dd', alpha=0.3)
+    axis_R.grid('#fae1dd',  alpha=0.3)
+
+    # ns values to use in the plots
+    ns_vals = torch.arange(0, Lp.shape[1])
+
+    # Plot the coefficients side-by-side.
+    axis_L1.bar(ns_vals,       Ll[ex, :].detach(), color=COLOR_1, alpha=1.0, width=0.4)
+    axis_L1.bar(ns_vals + 0.4, Lp[ex, :].detach(), color=COLOR_2, alpha=1.0, width=0.4)
+
+    # Calculate difference between labels and predictions of coefficients
+    delta_L = Ll[ex, :] - Lp[ex, :]
+
+    # Create color list, blue for positive, red for negative
+    cc = [COLOR_1 if val > 0 else COLOR_3 for val in delta_L]
+
+    # Plot the absolute difference between coefficients.
+    abs_diff = (Ll[ex, :] - Lp[ex, :]).abs()
+
+    # Plot the bars
+    axis_L2.bar(ns_vals, abs_diff.detach(), color=cc, alpha=1.0, width=0.5)
+
+    # Plot the spectral function in the corresponding axes
+    axis_R.plot(omega, Rl[ex, :].detach(), color=COLOR_1, linestyle='-',  alpha=1.0)
+    axis_R.plot(omega, Rp[ex, :].detach(), color=COLOR_2, linestyle='--', alpha=1.0)
+
+    # Add two rectangles to the handles to show this examples
+    handles = [
+        (
+            pat.Rectangle((0, 0), 2.0, 1.0, color=COLOR_1, alpha=1.0),
+            pat.Rectangle((0, 0), 2.0, 1.0, color=COLOR_2, alpha=1.0)
+        )
+    ]
+
+    # Add a legend to the figure
+    fig.legend(
+        handles, [f'{ne}: Label / Prediction'], numpoints=1, ncol=1, 
+        frameon=False, handler_map={tuple: HandlerTuple(ndivide=None)},
+        bbox_to_anchor=(0, 0.95, 1, 0), loc='upper center'
+    )
+
+    # Add a fake legend to the L2 to show the colours
+    axis_L2.legend(
+        [
+            pat.Rectangle((0, 0), 2.0, 1.0, color=COLOR_1, alpha=1.0),
+            pat.Rectangle((0, 0), 2.0, 1.0, color=COLOR_3, alpha=1.0)
+        ],
+        ['Positive', 'Negative'], ncol=1, loc='upper right', 
+        frameon=False, fontsize='x-small'
+    )
+
+    # Delete the copied tensors
+    del Ll, Lp, Rl, Rp, abs_diff
+
+    # Return the figure to save it or manipulate it
+    return fig
+
+# TODO: Use DistributedParallel
 def train_network(
-    network: torch.nn.Module, dataset: SpectralDataset, loss: torch.nn.Module, 
-    epochs: int, device: torch.device, batch_size: int, path: str = './status/monitor'
+        network: Network, dataset: SpectralDataset, criterion: torch.nn.Module, 
+        train_info: dict, device: torch.device, run_name: str
     ):
     """ Train a neural network module in a given dataset using a loss function.
 
     --- Parameters:
-    network: torch.nn.Module
+    network: Network
         Neural network to be trained.
     dataset: SpectralDataset
         Spectral function dataset used in the training.
-    loss: torch.nn.Module
+    criterion: torch.nn.Module
         Loss function used in the training.
-    epochs: int
-        Number of epochs used in the training.
+    train_info: dict
+        Dictionary containing the information about training.
     device: torch.device
         Device where the neural network will be trained.
-    batch_size: int
-        Number of batches to simultaneously train a network.
-    path: str
-        Path where the monitor data will be stored.
+    run_name: str
+        Name of the run. It is used by tensorboard
     """
 
-    # Wrap the given network in a DataParallel if possible
-    net_train = torch.nn.DataParallel(network).to(device)
+    # Assert the train_info dictionary contains some keys
+    assert all(k in train_info for k in ['epochs', 'batch_size', 'lr_decay', 'val_Nb'])
 
-    # Generate an optimiser to train the network
-    gd_optimiser = torch.optim.Adam(net_train.parameters())
+    # Generate a validation dataset with the same components as dataset
+    val_dataset = SpectralDataset(
+        dataset.peak_types, dataset.peak_limits, dataset.kernel, 
+        dataset.max_np, dataset.fixed_np, dataset.peak_ids
+    )
+
+    # Fill the validation dataset with some examples
+    val_dataset.generate(train_info['val_Nb'], dataset.Ns, dataset.U)
+
+    # Generate the validation dataset loader
+    val_loader = torch.utils.data.DataLoader(
+        val_dataset, batch_size=train_info['batch_size'], shuffle=False
+    )
+
+    # Wrap the given network around DataParallel if possible
+    network = torch.nn.parallel.DataParallel(network).to(device)
+
+    # Generate the optimiser used in the training
+    sgd_optim = torch.optim.Adam(network.parameters())
 
     # Modify the learning rate throughout the training
-    lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(gd_optimiser, gamma=0.9)
+    lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(sgd_optim, gamma=train_info['lr_decay'])
 
-    # Path where the output data will be stored
-    output_path = os.path.join(path, dataset.name, 'train')
+    # Generate some writers to flush the information
+    writer = SummaryWriter(os.path.join('./status/runs', run_name))
 
-    # If the path is not created, then create a directory
-    if not os.path.exists(output_path): os.makedirs(output_path)
+    # Generate a writer specific to the train and the test
+    writer_train = SummaryWriter(os.path.join('./status/runs', run_name, 'train'))
+    writer_valid = SummaryWriter(os.path.join('./status/runs', run_name, 'valid'))
 
-    # Create a buffer where the data will be flushed
-    stream_out = open(os.path.join(output_path, 'monitor.dat'), 'w')
+    # Add the network graph to the writer
+    writer.add_graph(network, dataset[:train_info['batch_size']].C.to(device))
 
-    # List where the monitoring data will be plotted
-    loss_values, loss_indices = [], []
+    # Flush the network data
+    writer.flush()
 
     # Train the network in the given dataset
-    for epoch in range(epochs):
+    for epoch in range(train_info['epochs']):
 
         # Create a DataLoader object to be used in the training
-        train_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
+        train_loader = torch.utils.data.DataLoader(
+            dataset, batch_size=train_info['batch_size'], shuffle=True
+        )
 
+        # Add some information to the writer
+        writer.add_scalar("train/lr", torch.Tensor(lr_scheduler.get_last_lr()), epoch)
+
+        # Train for each minibatch
         for b, pair in enumerate(train_loader):
 
             # Move each of the pairs to the network device
             C_label, L_label = pair.C.to(device).log(), pair.L.to(device)
 
             # Calculate the prediction of the network
-            L_pred = net_train(C_label)
+            L_hat_train = network(C_label)
 
             # Calculate the loss function using the prediction of the network
-            loss_value = loss(L_pred, L_label, C_label)
+            loss = criterion(L_hat_train, L_label, C_label)
+
+            # Add the loss to the writer
+            writer_train.add_scalar("loss",  loss, epoch * len(train_loader) + b)
+
+            # Print every some steps
+            if (b + 1) % (int(0.3 * len(train_loader))) == 0:
+                print(
+                    ' -- Training: Epoch [{}/{}], Step [{},{}], Loss: {:.4f}'.format(
+                        epoch + 1, train_info['epochs'], b + 1, len(train_loader), loss.item()
+                    ), flush=True
+                )
 
             # Set the gradients to zero in the optimiser
-            gd_optimiser.zero_grad()
+            sgd_optim.zero_grad()
 
             # Calculate the backward propagation of the loss function
-            loss_value.backward()
+            loss.backward()
 
             # Update the weights using a gradient descent step
-            gd_optimiser.step()
-            
-            # Flush some data into the stream every few iterations
-            if b % 20 == 0:
-                stream_out.write(f'{epoch} {b} {float(loss_value)}\n')
-                print(epoch, b, loss_value, flush=True)
-
-                # Append some data to the lists to generate some plots
-                loss_values.append(float(loss_value))
-                loss_indices.append(epoch * len(train_loader) + b)
+            sgd_optim.step()
 
             # Delete all uneeded tensor
-            del C_label, L_label, L_pred
+            del C_label, L_label, L_hat_train
+
+        # Get the validation metrics
+        valid_loss, total_dL, total_dR = 0.0, 0.0, 0.0
+
+        # Iterate inside the validation dataset
+        for v, pair in enumerate(val_loader):
+
+            # Move the pair to the correct device
+            C_label, L_label = pair.C.to(device), pair.L.to(device)
+
+            # Compute the validation prediction
+            L_hat_valid = network(C_label)
+
+            # Get the validation loss function
+            valid_loss += criterion(L_hat_valid, L_label, C_label).item()
+
+            # Compute the MSError in the coefficients
+            total_dL += float(((pair.L - L_hat_valid.cpu())  ** 2).mean())
+            
+            # Compute the difference in the reconstructed spectral function
+            R_label     = pair.L[:, 0, :].cpu() @ val_dataset.U.T
+            R_hat_valid = L_hat_valid.to(R_label.device)[:, 0, :] @ val_dataset.U.T
+
+            # Compute the total |max| distance for continuous functions
+            total_dR += float((R_label - R_hat_valid).abs().max(axis=1).values.mean())
+
+            # Plot some examples in the last iteration
+            if (v + 1) == len(val_loader):
+                # Construct the figure to be saved
+                figure = plot_validate_example(
+                    L_label[:, 0, :].detach().cpu(), L_hat_valid[:, 0, :].detach().cpu(), 
+                    R_label.detach().cpu(), R_hat_valid.detach().cpu(), val_dataset.kernel.omega, epoch
+                )
+
+                # Add the figure to the writer
+                writer.add_figure(f"train/validate_ex", figure, epoch)
+
+            # Delete all uneeded tensors
+            del C_label, L_label, L_hat_valid, R_label, R_hat_valid
+
+        # Log some validation information
+        print(
+            ' -- Validation: Epoch [{}/{}], Loss: {:.4f}, dL: {:.4f}, dR: {:.4f}'.format(
+                epoch + 1, train_info['epochs'], valid_loss / v, total_dL / v, total_dR / v
+            ), flush=True
+        )
+
+        # Write the validation loss to the writer
+        writer_valid.add_scalar("loss", valid_loss / v, (epoch + 1) * len(train_loader))
+
+        # Add the validation dL and dR metrics
+        writer.add_scalar("train/dL", total_dL / v, epoch)
+        writer.add_scalar("train/dR", total_dR / v, epoch)
+
+        # Flush the data to the disk
+        writer.flush()
+        writer_train.flush()
+        writer_valid.flush()
 
         # Modify the learning rate
         lr_scheduler.step()
 
-    # Close the stream
-    stream_out.close()
-
-    # Generate a figure to plot the data
-    fig = plt.figure(figsize=(16, 10))
-
-    # Add an axes to the figure
-    axis = fig.add_subplot(1, 1, 1)
-
-    # Add some information to the axis
-    axis.set_xlabel(r'$e \cdot N_b + b$')
-    axis.set_ylabel(r'Loss')
-    axis.grid('#fae1dd')
-    axis.set_facecolor('#fcfcfc')
-
-    # Plot the data
-    axis.plot(loss_indices, loss_values, color='#eb5e28')
-
-    # Eliminate the mirror axis from the figure
-    eliminate_mirror_axis(axis)
-
-    # Save the figure
-    fig.savefig(os.path.join(output_path, 'train_loss.pdf'))
-
-    # Set the parameters in the non-parallel network
-    network.set_params(net_train.state_dict())
-
+    # Flush the writer data and close it
+    writer.close()
+    writer_train.close()
+    writer_valid.close()
 
 if __name__ == '__main__':
     pass

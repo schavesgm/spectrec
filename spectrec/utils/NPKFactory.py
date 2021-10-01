@@ -1,6 +1,7 @@
 # Import user-defined modules
 from spectrec.factory import Peak
 from spectrec.factory import Kernel
+from spectrec.network import Network
 
 # -- Factory to deal with peaks {{{
 __registered_peaks = {}
@@ -32,6 +33,22 @@ def retrieve_kernel_class(name: str) -> Kernel:
         return __registered_kernels[name]
     except KeyError:
         raise KeyError(f'{name =} is not registered: {__registered_kernels.keys()}')
+# -- }}}
+
+# -- Factory to deal with networks {{{
+__registered_networks = {}
+
+def register_network_class(name: str, network: Network):
+    """ Register a network to be used by the parser. """
+    assert issubclass(network, Network), f'{network =} must be a subclass of Network.'
+    __registered_networks[name] = network
+
+def retrieve_network_class(name: str) -> Network:
+    """ Return a network class from the registered set. """
+    try:
+        return __registered_networks[name]
+    except KeyError:
+        raise KeyError(f'{name =} is not registered: {__registered_networks.keys()}')
 # -- }}}
 
 if __name__ == '__main__':

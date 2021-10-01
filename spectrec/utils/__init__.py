@@ -1,11 +1,13 @@
 # Load some needed classes
-from .InputParser import InputParser
+from .SpectrecInput import SpectrecInput
 
 # Load the factory functions
-from .PKFactory import register_peak_class
-from .PKFactory import register_kernel_class
-from .PKFactory import retrieve_peak_class
-from .PKFactory import retrieve_kernel_class
+from .NPKFactory import register_peak_class
+from .NPKFactory import register_kernel_class
+from .NPKFactory import register_network_class
+from .NPKFactory import retrieve_peak_class
+from .NPKFactory import retrieve_kernel_class
+from .NPKFactory import retrieve_network_class
 
 # Load some needed functions
 from .train import train_network

@@ -11,6 +11,7 @@ class Network(nn.Module):
 
     # Define the network name
     _net_id: str = 'baseNet'
+    name:    str = 'noName'
 
     def set_params(self, state_dict: dict, eliminate_str: str = 'module.') -> None:
         """ Set the parameters of the model using the state_dict provided. """
@@ -25,7 +26,7 @@ class Network(nn.Module):
         # Load the state dictionary
         self.load_state_dict(clean_state_dict)
 
-    def save_params(self, identifier: str, path: str = './status/network'):
+    def save_params(self, path: str = './status/network'):
         """ Set the current status of the network into a given file. """
 
         # Path where the data will be stored
@@ -35,13 +36,13 @@ class Network(nn.Module):
         if not os.path.exists(save_path): os.makedirs(save_path)
 
         # Save the weights into the path
-        torch.save(self.state_dict(), os.path.join(save_path, f'{identifier}.pt'))
+        torch.save(self.state_dict(), os.path.join(save_path, f'{self.name}.pt'))
 
-    def load_params(self, identifier: str, path: str = './status/network', verbose: bool = True):
+    def load_params(self, path: str = './status/network', verbose: bool = True):
         """ Load the parameters of a network with given identifier. """
 
         # Path to the given file
-        load_path = os.path.join(path, self._net_id, f'{identifier}.pt')
+        load_path = os.path.join(path, self._net_id, f'{self.name}.pt')
 
         # Try loading the parameters
         try:
@@ -53,12 +54,12 @@ class Network(nn.Module):
             self.eval()
 
             if verbose: 
-                print(f'Loaded {self._net_id}:{identifier} instance', flush=True)
+                print(f' -- Loaded {self._net_id}:{self.name} instance', flush=True)
         
         # If the file is not found, just don't do anything
         except FileNotFoundError:
             if verbose:
-                print(f'Network {self._net_id}:{identifier} not found. Not instance', flush=True)
+                print(f' -- Network {self._net_id}:{self.name} not found. New instance', flush=True)
 
     @property
     def num_weights(self) -> int:
@@ -69,7 +70,6 @@ class Network(nn.Module):
     def net_id(self) -> str:
         """ Retrieve the network id. """
         return self._net_id
-
 
 if __name__ == '__main__':
     pass

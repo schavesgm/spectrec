@@ -87,10 +87,10 @@ class UpStage(nn.Module):
     def __crop_center(tensor: torch.Tensor, num_points: int) -> torch.Tensor:
         """ Crop num_points elements from a tensor around the middle. """
         # Obtain the midpoint of the tensor along the L direction
-        mid_point = tensor.shape[2] // 2
-        beg_point = int(mid_point - num_points / 2)
-        end_point = int(mid_point + num_points / 2)
-        return tensor[:,:,beg_point:end_point]
+        mid_point = tensor.size(2) // 2
+        beg_point = mid_point - num_points // 2
+        end_point = mid_point + num_points // 2
+        return tensor[:, :, beg_point:end_point]
 
 class CNNOut(nn.Module):
     """ Convolutional output of a 1d UNet network. """

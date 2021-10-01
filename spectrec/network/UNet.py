@@ -21,7 +21,7 @@ class UNet(Network):
     # -- Identifier of the network
     _net_id: str = 'UNet'
 
-    def __init__(self, input_size: int, output_size: int, in_channels: int = 1, out_channels: int = 1, p: float = 0.0):
+    def __init__(self, input_size: int, output_size: int, name: str = None, in_channels: int = 1, out_channels: int = 1, p: float = 0.0):
         
         # Call the base class constructor
         super().__init__()
@@ -31,6 +31,9 @@ class UNet(Network):
 
         # Save the number of input and output channels
         self.Ci, self.Co = in_channels, out_channels
+
+        # Save the net of the network
+        if name is not None: self.name = name
 
         # Amplify the data using a linear layer if needed
         if self.Li < 572:

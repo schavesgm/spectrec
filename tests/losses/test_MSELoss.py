@@ -23,7 +23,7 @@ class TestMSELoss:
 
         # Assert some equalities on the data
         assert float(loss_1) == pytest.approx(0.0)
-        assert float(loss_2) == float((input_1 ** 2).sum())
+        assert float(loss_2) == float((input_1 ** 2).mean())
 
         # Now, test the behaviour of the loss function using several batches
         input_2 = torch.cat([input_1 for i in range(1000)], dim = 0)
@@ -34,7 +34,7 @@ class TestMSELoss:
 
         # Assert some equalities
         assert float(loss_3) == pytest.approx(0.0)
-        assert float(loss_4) == pytest.approx(float((input_1 ** 2).sum()))
+        assert float(loss_4) == pytest.approx(float((input_1 ** 2).mean()))
 
 if __name__ == '__main__':
     pass

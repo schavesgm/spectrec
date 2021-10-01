@@ -44,13 +44,13 @@ class TestRMSELoss:
 
         # Calculate the losses
         loss_1 = rmseloss_1(in_data.L, in_data.L, in_data.C.log())
-        loss_2 = rmseloss_1(in_data.L, in_data.L, in_data.C.log())
-        loss_3 = rmseloss_1(in_data.L, in_data.L, in_data.C.log())
+        loss_2 = rmseloss_2(in_data.L, in_data.L, in_data.C.log())
+        loss_3 = rmseloss_3(in_data.L, in_data.L, in_data.C.log())
 
         # Assert that the results are close to zero
-        assert float(loss_1) == pytest.approx(0.0, abs = 0.1)
-        assert float(loss_2) == pytest.approx(0.0, abs = 0.1)
-        assert float(loss_3) == pytest.approx(0.0, abs = 0.1)
+        assert float(loss_1) == pytest.approx(0.0, abs=0.1)
+        assert float(loss_2) == pytest.approx(0.0, abs=0.1)
+        assert float(loss_3) == pytest.approx(0.0, abs=0.1)
 
 if __name__ == '__main__':
     pass

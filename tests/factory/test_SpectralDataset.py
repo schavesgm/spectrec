@@ -117,5 +117,27 @@ class TestSpectralDataset:
         assert dataset.Ns == 96 # Remove the temporal directory
         shutil.rmtree('./temp')
 
+    def test_get_subdataset(self, dataset):
+        """ Test that we can obtain a subdataset of the set. """
+
+        # Generate a dataset of 2000 examples
+        dataset.generate(2000, 96)
+
+        # Get two subdatasets from the dataset
+        sub1, sub2 = dataset.get_subdataset(0.5, False), dataset.get_subdataset(0.7, True)
+
+        # Assert some conditions on the subdatasets
+        assert isinstance(sub1, SpectralDataset)
+        assert isinstance(sub2, SpectralDataset)
+
+        # Assert some conditions on the first dataset
+        assert sub1.Nb == dataset.Nb // 2
+        assert torch.equal(sub1[:].C, dataset[:1000].C)
+        assert torch.equal(sub1[:].L, dataset[:1000].L)
+
+        # Assert some conditions on the second dataset
+        assert sub2.Nb == int(0.7 * dataset.Nb)
+
+
 if __name__ == '__main__':
     pass

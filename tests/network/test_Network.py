@@ -54,17 +54,23 @@ class TestNetwork:
     def test_IO(self, output_path):
         """ Test the networks ability to save/load parameters. """
 
-        # Generate a neural network object
-        net = UNet(64, 20)
+        # Generate two neural networks
+        net_1, net_2 = UNet(64, 20), UNet(100, 20)
+
+        # Change the name of the second neural network
+        net_2.name = 'test'
 
         # Save the parameters of the network into a file
-        net.save_params('test', path=output_path)
+        net_1.save_params(path=output_path)
+        net_2.save_params(path=output_path)
 
-        # Assert the file exists
+        # Assert both parameters exist
         assert os.path.exists(f'{output_path}/UNet/test.pt')
+        assert os.path.exists(f'{output_path}/UNet/noName.pt')
 
         # Assert that we can load the parameters from the file
-        net.load_params('test', path=output_path, verbose=False)
+        net_1.load_params(path=output_path, verbose=False)
+        net_2.load_params(path=output_path, verbose=False)
 
         # Delete the newly created folder
         shutil.rmtree('./status')

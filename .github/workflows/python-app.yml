@@ -31,9 +31,6 @@ jobs:
         uses: abatilo/actions-poetry@v2.0.0
         with:
           poetry-version: ${{ matrix.poetry-version }}
-      
-      - name: Install tensorboard
-        run: pip install tensorboard
 
       - name: Cache Poetry virtualenv
         uses: actions/cache@v1
@@ -46,7 +43,7 @@ jobs:
 
       - name: Install Dependencies using Poetry
         run: poetry install
-        if: steps.cache.outputs.cache-hit != 'true'
+        # if: steps.cache.outputs.cache-hit != 'true'
 
       - name: Run pytest
         run: PYTHONPATH=spectrec/ poetry run python -m pytest -v --cov=spectrec/ tests/

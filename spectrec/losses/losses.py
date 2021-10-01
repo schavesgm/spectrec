@@ -18,7 +18,7 @@ class MSELoss(nn.Module):
 
     def forward(self, outputs: torch.Tensor, labels: torch.Tensor, *args) -> torch.Tensor:
         """ Forward pass of the loss function. """
-        return ((outputs - labels) ** 2).sum(dim = 2).mean()
+        return ((outputs - labels) ** 2).mean()
 
 class RMSELoss(nn.Module):
     """ Recurrent MSELoss, the loss function is the sum of two losses functions. The first
@@ -77,8 +77,8 @@ class RMSELoss(nn.Module):
         output_C = output_C.abs().log()
 
         # Calculate the mean squared error for both outputs
-        mse_outputs = ((outputs  - labels) ** 2).sum(dim = 2).mean()
-        mse_inputs  = ((output_C - inputs) ** 2).sum(dim = 2).mean()
+        mse_outputs = ((outputs  - labels) ** 2).mean()
+        mse_inputs  = ((output_C - inputs) ** 2).mean()
 
         return self.a * mse_outputs + self.b * mse_inputs
 

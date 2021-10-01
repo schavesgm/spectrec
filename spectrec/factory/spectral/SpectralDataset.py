@@ -17,7 +17,6 @@ from .SpectralFunction import SpectralFunction
 # -- Spectral function output tuple
 SpectralOut = namedtuple('SpectralOut', 'C L')
 
-
 class SpectralDataset(torch.utils.data.Dataset):
     """ Torch dataset containing spectral functions tranining sets. """
 
@@ -92,91 +91,37 @@ class SpectralDataset(torch.utils.data.Dataset):
         del self.__data['R'], self.__data['C'], self.__data['L'], self.__data['U']
         self.__data = {'R': None, 'C': None, 'U': None, 'L': None}
 
-    def test(
-        self, network: torch.nn.Module, loss: torch.nn.Module, prop: float, device: torch.device, 
-        batch_size: int, val_or_test: str, prefix: str = '', suffix: str = '', rand: bool = True, 
-        path: str = './status/monitor'
-    ) -> dict:
+    def get_subdataset(self, prop: float, rand: bool = True):
+        """ Get a proportion of the dataset, either selecting random examples or not. """
 
-        # Assert the dataset has been generated
-        assert self.is_generated, 'Dataset cannot be tested as data is not generated.'
+        # Assert the data has been already generated
+        assert self.is_generated, 'Dataset cannot be retrieved as it is not generated.'
 
-        # Assert val_or_test is either val or test
-        assert val_or_test in ['val', 'test'], '{val_or_test = } must be in [val, test]'
+        # Assert the proportion is less than one
+        assert 0.0 < prop <= 1.0, f'{prop = } must be inside (0.0, 1.0]'
 
-        # Number of examples in the test set
-        Nb_test = int(prop * self.Nb)
+        # Number of points to retrieve using perc
+        Nb_prop = int(prop * self.Nb)
 
-        # Get the network in evaluation mode. TODO: Check output Confidence Intervals
-        net_test = network.to(device).eval()
+        # Indices of each example present in the dataset
+        idx = torch.arange(0, self.Nb)
 
-        # Select a subset of the data
-        test_data = self.__select_prop(prop, rand)
+        # Select some random values or the first Nb results depending on selection
+        idx = torch.randperm(len(idx))[:Nb_prop] if rand else idx[:Nb_prop]
+        
+        # Generate a similar spectral dataset
+        dataset = SpectralDataset(
+            self.peak_types, self.peak_limits, self.kernel, self.max_np, self.fixed_np, self.peak_ids
+        )
 
-        # Split the test indices into difference batches
-        batch_idx = torch.split(torch.arange(0, Nb_test), batch_size)
+        # Set some tensors on newly created dataset
+        dataset.R = self.R[idx, :]
+        dataset.C = self.C[idx, :]
+        dataset.L = self.L[idx, :]
+        dataset.U = self.U
 
-        # Value of the loss function in the test set
-        loss_value = 0.0
-
-        # Buffer containing the predictions of the network
-        buffer_pred = torch.empty((Nb_test, self.Ns), dtype = torch.float32)
-
-        # Calculate the network prediction for each batch
-        for batch in batch_idx:
-            
-            # Get the current batch from the set to test the results
-            C_batch = test_data['C'][batch, :].detach().to(device).log()
-            L_batch = test_data['L'][batch, :].detach().to(device)
-
-            # Generate the correct dimensions of the network
-            C_batch = C_batch.view(C_batch.shape[0], 1, C_batch.shape[1])
-            L_batch = L_batch.view(L_batch.shape[0], 1, L_batch.shape[1])
-
-            # Calculate the prediction of the network
-            L_pred = net_test(C_batch).detach()
-
-            # Calculate the loss function value
-            loss_value += float(loss(L_pred, L_batch, C_batch).detach())
-
-            # Save the predicted coefficients of the network
-            buffer_pred[batch, :] = L_pred.cpu().view(len(batch), self.Ns)
-
-            # Delete the uneeded tensors
-            del C_batch, L_batch, L_pred
-
-        # Add the prefix and the suffix to the name identifier
-        identifier = f'{prefix}_{self.name}'  if prefix != '' else self.name
-        identifier = f'{identifier}_{suffix}' if suffix != '' else identifier
-
-        # Path where the data will be stored
-        path = os.path.join(path, identifier, val_or_test)
-
-        # Create the folder if it does not exist
-        if not os.path.exists(path): os.makedirs(path)
-
-        # Dictionary containing information to monitor the test_set
-        json_info = self.info | {
-            'test': {
-                'Nb':   Nb_test,
-                'prop': prop,
-                'loss': float(loss_value / Nb_test),
-                'dL':   float(torch.sum((test_data['L'] - buffer_pred) ** 2, axis=1).mean()),
-                'dR':   float((test_data['R'] - buffer_pred @ self.U.T).abs().max(axis=1).values.mean()),
-            },
-        }
-
-        # Dump the information into the json file
-        with open(os.path.join(path, 'json_out.dat'), 'w', encoding='utf8') as json_out:
-            json.dump(json_info, json_out, ensure_ascii=False, indent=4)
-
-        # Plot several figures to monitor the behaviour of the network
-        for ex in range(4):
-            self.__plot_test_examples(buffer_pred, test_data, examples=1).savefig(
-                os.path.join(path, f'test_example_{ex}.pdf')
-            )
-
-        return json_info
+        # Return the newly created dataset
+        return dataset
 
     def save_dataset(self, prefix: str = '', suffix: str = '', path: str = './status/dataset') -> None:
         """ Save all the dataset in a given path. A prefix and a suffix can be appended to the
@@ -222,7 +167,7 @@ class SpectralDataset(torch.utils.data.Dataset):
         name locator to further specify the dataset. The name convention to define a dataset is
         the following:
 
-                        {prefix}_b{Nb}_w{Nw}_s{Ns}_t{Nt}_{suffix}
+                    {prefix}_b{Nb}_w{Nw}_s{Ns}_t{Nt}_wi{wr[0]}_wf{wr[1]}_{suffix}
 
         --- Parameters:
         Nb: int
@@ -321,112 +266,6 @@ class SpectralDataset(torch.utils.data.Dataset):
         # Return the CPU allocated version of the basis functions
         return L.cpu()
 
-    def __select_prop(self, prop: float, rand: bool) -> dict[str, torch.Tensor]:
-        """ Select a proportion of the whole dataset randomising it or not. """
-
-        # Number of points to retrieve using perc
-        Nb_prop = int(prop * self.Nb)
-
-        # Indices of each example present in the dataset
-        idx = torch.arange(0, self.Nb)
-
-        # Select some random values or the first Nb results depending on selection
-        idx = torch.randperm(len(idx))[:Nb_prop] if rand else idx[:Nb_prop]
-        
-        # Fill the dictionary with the correct results
-        return {
-            'R': self.R[idx, :], 'C': self.C[idx, :], 
-            'L': self.L[idx, :], 'U': self.U
-        }
-
-    def __plot_test_examples(self, Lp: torch.Tensor, data: dict, examples: int = 1) -> plt.Figure:
-        """ Plot some random examples from the test set into a matplotlib's figure. """
-
-        # Color palette used in the plots
-        COLORS = ['#168AAD', '#D00000', '#2D6A4F', '#5A189A']
-
-        # Generate the matplotlib figure
-        fig = plt.figure(figsize=(16, 10))
-
-        # Generate three (2 left 1 right) axes in the figure
-        axis_L1, axis_L2 = fig.add_subplot(2, 2, 1), fig.add_subplot(2, 2, 3)
-        axis_R           = fig.add_subplot(1, 2, 2)
-
-        # Set some properties in each of the axes
-        axis_L1.set_xlabel(r'$n_s$')
-        axis_L1.set_ylabel(r'$L(n_s)$')
-        axis_L2.set_xlabel(r'$n_s$')
-        axis_L2.set_ylabel(r'$|(\hat{L}(n_s) - L(n_s))/L(n_s)|$')
-        axis_R.set_xlabel(r'$\omega$')
-        axis_R.set_ylabel(r'$\rho(\omega)$')
-        axis_L1.grid('#fae1dd', alpha=0.3)
-        axis_L2.grid('#fae1dd', alpha=0.3)
-        axis_R.grid('#fae1dd', alpha=0.3)
-
-        # Reconstruct the predicted spectral functions from the coefficients
-        Rp = (Lp @ self.U.T)
-
-        #List of handlers and labels to customise the legend 
-        handles, labels = [], [] 
-
-        # ns values to use in the plots
-        ns_vals = torch.arange(0, self.Ns)
-
-        # Add some lines to the axes
-        for ex in range(examples):
-
-            # Pick a random example from the dataset
-            pe = int(torch.randint(0, data['L'].shape[0], size = (1,)))
-
-            # Get the examples to plot in this round
-            Ll = data['L'][pe, :].detach().numpy()
-            Rl = data['R'][pe, :].detach().numpy()
-
-            # Plot the coefficients side-by-side.
-            axis_L1.bar(ns_vals,       Ll,         color=COLORS[ex], alpha=1.0, width=0.2)
-            axis_L1.bar(ns_vals + 0.2, Lp[pe, :],  color=COLORS[ex], alpha=0.5, width=0.2)
-
-            # Ll numpy to torch
-            Ll_torch = torch.from_numpy(Ll)
-
-            # Calculate difference between labels and predictions of coefficients
-            delta_L = Ll_torch - Lp[pe, :]
-
-            # Create color list, blue for positive, red for negative
-            cc=['colors']*len(delta_L)
-            for n,val in enumerate(delta_L):
-                if val>0:
-                    cc[n]='#b80000'
-                elif val<=0:
-                    cc[n]='#168AAD'
-
-            # Plot the absolute difference between coefficients. TODO: Put a label with red and blue
-            axis_L2.bar(ns_vals, torch.abs((Ll_torch - Lp[pe, :])/Ll_torch), color=cc, alpha=0.7, width=0.2)
-
-            # Plot the spectral function in the corresponding axes
-            axis_R.plot(self.kernel.omega, Rl,        color=COLORS[ex], linestyle='-', alpha=1.0)
-            axis_R.plot(self.kernel.omega, Rp[pe, :], color=COLORS[ex], linestyle='--', alpha=0.5)
-
-            # Add two rectangles to the handles to show this examples
-            handles.append(
-                tuple(
-                    pat.Rectangle((0, 0), 2.0, 1.0, color=COLORS[ex], alpha=1.0),
-                    pat.Rectangle((0, 0), 2.0, 1.0, color=COLORS[ex], alpha=0.5)
-                )
-            )
-
-            # Add the label string to the sample
-            labels.append(f'Label / Prediction: Example {ex}')
-
-        # Add a legend to the figure
-        fig.legend(
-            handles, labels, numpoints=1, ncol=examples, frameon=False,
-            handler_map={tuple: HandlerTuple(ndivide=None)},
-            bbox_to_anchor=(0, 0.95, 1, 0), loc='upper center'
-        )
-
-        return fig
-
     def __load_tensor(self, tensor_id: str, identifier: str, path: str) -> None:
         """ Load a tensor from the path into data. """
 
@@ -447,7 +286,7 @@ class SpectralDataset(torch.utils.data.Dataset):
         suffix = f'_{suffix}' if suffix != '' else ''
 
         # Generate the name identifier that should use the dataset
-        name = f'b{Nb}_s{Ns}_w{self.Nw}_t{self.Nt}_mp{self.max_np}_fp{int(self.fixed_np)}'
+        name = self.name.replace('bNone_sNone', f'b{Nb}_s{Ns}')
 
         return f'{prefix}{name}{suffix}'
 
@@ -514,20 +353,44 @@ class SpectralDataset(torch.utils.data.Dataset):
         """ Dataset of spectral functions. """
         return self.__data['R']
 
+    @R.setter
+    def R(self, new_R: torch.Tensor):
+        """ Set new spectral functions. """
+        assert new_R.shape[1] == self.kernel.Nw, \
+            f'Spectral functions must have {self.kernel.Nw = } columns'
+        self.__data['R'] = new_R
+
     @property
     def C(self) -> torch.Tensor:
         """ Dataset of correlation functions. """
         return self.__data['C']
+
+    @C.setter
+    def C(self, new_C: torch.Tensor):
+        """ Set new correlation functions. """
+        assert new_C.shape[1] == self.kernel.Nt, \
+            f'Correlation functions must have {self.kernel.Nt = } columns.'
+        self.__data['C'] = new_C
 
     @property
     def L(self) -> torch.Tensor:
         """ Dataset of coefficients in the expansion. """
         return self.__data['L']
 
+    @L.setter
+    def L(self, new_L: torch.Tensor):
+        """ Set new coefficients. """
+        self.__data['L'] = new_L
+
     @property
     def U(self) -> torch.Tensor:
         """ Dataset of basis functions. """
         return self.__data['U']
+
+    @U.setter
+    def U(self, new_U: torch.Tensor) -> torch.Tensor:
+        """ Set new basis functions. """
+        self.__data['U'] = new_U
 
     @property
     def is_generated(self) -> bool:
@@ -537,7 +400,14 @@ class SpectralDataset(torch.utils.data.Dataset):
     @property
     def name(self) -> str:
         """ Name identifier of the dataset. """
-        return f'b{self.Nb}_s{self.Ns}_w{self.Nw}_t{self.Nt}_mp{self.max_np}_fp{int(self.fixed_np)}'
+
+        # Generate the name identifier of the dataset
+        name = f'b{self.Nb}_s{self.Ns}_w{self.Nw}_t{self.Nt}'
+        name = f'{name}_mp{self.max_np}_fp{int(self.fixed_np)}'
+        name = f'{name}_wi{self.kernel.w_range[0]:.2f}'
+        name = f'{name}_wf{self.kernel.w_range[1]:.2f}'
+
+        return name
 
     @property
     def info(self) -> dict:

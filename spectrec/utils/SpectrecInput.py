@@ -79,10 +79,11 @@ def validate_train(content: dict):
     train = content['train']
 
     # Assert some keys are present
-    assert (k in train for k in ['val_Nb', 'epochs', 'batch_size', 'lr_decay'])
+    assert (k in train for k in ['val_Nb', 'epochs', 'batch_size', 'lr_decay', 'num_valid'])
 
     # Assert some conditions on its contents
     assert isinstance(train['val_Nb'], int)     and train['val_Nb'] > 0
+    assert isinstance(train['num_valid'], int)  and train['num_valid'] > 0
     assert isinstance(train['epochs'], int)     and train['epochs'] > 0
     assert isinstance(train['batch_size'], int) and train['batch_size'] > 0
     assert isinstance(train['lr_decay'], float)
@@ -181,6 +182,7 @@ class SpectrecInput:
         """ Parse all the train and validation information from input file. """
         return {
             'val_Nb':     self.__content['train']['val_Nb'],
+            'num_valid':  self.__content['train']['num_valid'],
             'epochs':     self.__content['train']['epochs'],
             'batch_size': self.__content['train']['batch_size'],
             'lr_decay':   self.__content['train']['lr_decay'],

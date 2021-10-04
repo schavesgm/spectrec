@@ -120,10 +120,32 @@ def plot_validate_example(
     # Return the figure to save it or manipulate it
     return fig
 
+def generate_validate_sets(dataset: SpectralDataset, val_Nb: int, num_sets: int) -> list[SpectralDataset]:
+    """ Generate some validation datasets to be used in the trainin """
+
+    # Generate a list that will contain the validation datasets
+    validations = [None] * num_sets
+
+    for v in range(num_sets):
+
+        # Generate a validation dataset with the same components as dataset
+        val_dataset = SpectralDataset(
+            dataset.peak_types, dataset.peak_limits, dataset.kernel, 
+            dataset.max_np, dataset.fixed_np, dataset.peak_ids
+        )
+
+        # Generate some data in the validation dataset
+        val_dataset.generate(val_Nb, dataset.Ns, dataset.U)
+
+        # Add the validation dataset to the list
+        validations[v] = val_dataset
+
+    return validations
+
+
 # TODO: Use DistributedParallel
 def train_network(
-        network: Network, dataset: SpectralDataset, criterion: torch.nn.Module, 
-        train_info: dict, device: torch.device, run_name: str
+        network: Network, dataset: SpectralDataset, criterion: torch.nn.Module, train_info: dict, device: torch.device, run_name: str
     ):
     """ Train a neural network module in a given dataset using a loss function.
 
@@ -143,21 +165,10 @@ def train_network(
     """
 
     # Assert the train_info dictionary contains some keys
-    assert all(k in train_info for k in ['epochs', 'batch_size', 'lr_decay', 'val_Nb'])
+    assert all(k in train_info for k in ['epochs', 'batch_size', 'lr_decay', 'val_Nb', 'num_valid'])
 
-    # Generate a validation dataset with the same components as dataset
-    val_dataset = SpectralDataset(
-        dataset.peak_types, dataset.peak_limits, dataset.kernel, 
-        dataset.max_np, dataset.fixed_np, dataset.peak_ids
-    )
-
-    # Fill the validation dataset with some examples
-    val_dataset.generate(train_info['val_Nb'], dataset.Ns, dataset.U)
-
-    # Generate the validation dataset loader
-    val_loader = torch.utils.data.DataLoader(
-        val_dataset, batch_size=train_info['batch_size'], shuffle=False
-    )
+    # Generate several validation sets
+    validations = generate_validate_sets(dataset, train_info['val_Nb'], train_info['num_valid'])
 
     # Wrap the given network around DataParallel if possible
     network = torch.nn.parallel.DataParallel(network).to(device)
@@ -171,12 +182,17 @@ def train_network(
     # Generate some writers to flush the information
     writer = SummaryWriter(os.path.join('./status/runs', run_name))
 
-    # Generate a writer specific to the train and the test
+    # Generate a writer specific to the train
     writer_train = SummaryWriter(os.path.join('./status/runs', run_name, 'train'))
-    writer_valid = SummaryWriter(os.path.join('./status/runs', run_name, 'valid'))
+
+    # Generate several validation writers
+    writer_valid = [
+        SummaryWriter(os.path.join('./status/runs', run_name, f'valid_{s}')) \
+        for s in range(train_info['num_valid'])
+    ]
 
     # Add the network graph to the writer
-    writer.add_graph(network, dataset[:train_info['batch_size']].C.to(device))
+    writer.add_graph(network, dataset[:train_info['batch_size']].C)
 
     # Flush the network data
     writer.flush()
@@ -227,63 +243,75 @@ def train_network(
             # Delete all uneeded tensor
             del C_label, L_label, L_hat_train
 
-        # Get the validation metrics
-        valid_loss, total_dL, total_dR = 0.0, 0.0, 0.0
+        # Iterate for all validation sets to validate the training
+        for nv, valid_set in enumerate(validations):
 
-        # Iterate inside the validation dataset
-        for v, pair in enumerate(val_loader):
+            # Generate a validation loader to be used in the training
+            valid_loader = torch.utils.data.DataLoader(
+                valid_set, batch_size=train_info['batch_size'], shuffle=False
+            )
 
-            # Move the pair to the correct device
-            C_label, L_label = pair.C.to(device), pair.L.to(device)
+            # Get the validation metrics for this set
+            valid_loss, total_dL, total_dR = 0.0, 0.0, 0.0
 
-            # Compute the validation prediction
-            L_hat_valid = network(C_label)
+            # Iterate inside the validation dataset
+            for nvb, pair in enumerate(valid_loader):
 
-            # Get the validation loss function
-            valid_loss += criterion(L_hat_valid, L_label, C_label).item()
+                # Move the pair to the correct device
+                C_label, L_label = pair.C.to(device).log(), pair.L.to(device)
 
-            # Compute the MSError in the coefficients
-            total_dL += float(((pair.L - L_hat_valid.cpu())  ** 2).mean())
+                # Compute the validation prediction
+                L_hat_valid = network(C_label)
+
+                # Get the validation loss function
+                valid_loss += criterion(L_hat_valid, L_label, C_label).item()
+
+                # Compute the MSError in the coefficients
+                total_dL += float(((pair.L - L_hat_valid.cpu())  ** 2).mean())
             
-            # Compute the difference in the reconstructed spectral function
-            R_label     = pair.L[:, 0, :].cpu() @ val_dataset.U.T
-            R_hat_valid = L_hat_valid.to(R_label.device)[:, 0, :] @ val_dataset.U.T
+                # Compute the difference in the reconstructed spectral function
+                R_label     = pair.L[:, 0, :].cpu() @ valid_set.U.T
+                R_hat_valid = L_hat_valid.to(R_label.device)[:, 0, :] @ valid_set.U.T
 
-            # Compute the total |max| distance for continuous functions
-            total_dR += float((R_label - R_hat_valid).abs().max(axis=1).values.mean())
+                # Compute the total |max| distance for continuous functions
+                total_dR += float((R_label - R_hat_valid).abs().max(axis=1).values.mean())
 
-            # Plot some examples in the last iteration
-            if (v + 1) == len(val_loader):
-                # Construct the figure to be saved
-                figure = plot_validate_example(
-                    L_label[:, 0, :].detach().cpu(), L_hat_valid[:, 0, :].detach().cpu(), 
-                    R_label.detach().cpu(), R_hat_valid.detach().cpu(), val_dataset.kernel.omega, epoch
-                )
+                # Plot some examples in the last iteration
+                if (nvb + 1) == len(valid_loader):
 
-                # Add the figure to the writer
-                writer.add_figure(f"train/validate_ex", figure, epoch)
+                    # Monitor some examples in the validation set
+                    for nf in range(3):
 
-            # Delete all uneeded tensors
-            del C_label, L_label, L_hat_valid, R_label, R_hat_valid
+                        # Construct a figure to be saved
+                        figure = plot_validate_example(
+                            L_label[:, 0, :].detach().cpu(), L_hat_valid[:, 0, :].detach().cpu(), 
+                            R_label.detach().cpu(), R_hat_valid.detach().cpu(), valid_set.kernel.omega, epoch, nf
+                        )
 
-        # Log some validation information
-        print(
-            ' -- Validation: Epoch [{}/{}], Loss: {:.4f}, dL: {:.4f}, dR: {:.4f}'.format(
-                epoch + 1, train_info['epochs'], valid_loss / v, total_dL / v, total_dR / v
-            ), flush=True
-        )
+                        # Add the figure to the writer
+                        writer.add_figure(f"train/validate{nv}_ex{nf}", figure, epoch)
 
-        # Write the validation loss to the writer
-        writer_valid.add_scalar("loss", valid_loss / v, (epoch + 1) * len(train_loader))
+                # Delete all uneeded tensors
+                del C_label, L_label, L_hat_valid, R_label, R_hat_valid
 
-        # Add the validation dL and dR metrics
-        writer.add_scalar("train/dL", total_dL / v, epoch)
-        writer.add_scalar("train/dR", total_dR / v, epoch)
+            # Log some validation information
+            print(
+                ' -- Validation {}: Epoch [{}/{}], Loss: {:.4f}, dL: {:.4f}, dR: {:.4f}'.format(
+                nv, epoch + 1, train_info['epochs'], valid_loss / nvb, total_dL / nvb, total_dR / nvb
+                ), flush=True
+            )
+
+            # Write the validation loss to the writer
+            writer_valid[nv].add_scalar("loss", valid_loss / nvb, (epoch + 1) * len(train_loader))
+
+            # Add the validation dL and dR metrics
+            writer_valid[nv].add_scalar("train/dL", total_dL / nvb, epoch)
+            writer_valid[nv].add_scalar("train/dR", total_dR / nvb, epoch)
 
         # Flush the data to the disk
         writer.flush()
         writer_train.flush()
-        writer_valid.flush()
+        [w.flush() for w in writer_valid]
 
         # Modify the learning rate
         lr_scheduler.step()
@@ -291,7 +319,7 @@ def train_network(
     # Flush the writer data and close it
     writer.close()
     writer_train.close()
-    writer_valid.close()
+    [w.close() for w in writer_valid]
 
 if __name__ == '__main__':
     pass

@@ -2,4 +2,5 @@
 
 # TODO:
  - Add some tests over './spectrec/utils/SpectrecInput.py'.
- - Check the normalisation of input and output to enhance training.
+ - Add a test step over the training script.
+ - Try using DataParallel in the training to speed up calculations.

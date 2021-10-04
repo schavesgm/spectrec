@@ -9,10 +9,10 @@ dataset: {
   parameters: {
     Nb: 2000,
     Nt: 64,
-    Ns: 32,
+    Ns: 40,
     Nw: 1000,
     wr: [0.0, 8.0],
-    mp: 2,
+    mp: 1,
     fp: True,
   },
   generation: {
@@ -28,9 +28,9 @@ dataset: {
     # Peak class and identifier; use classname(:\w+)?. Classes need to be registered
     peaks_used:  ['GaussianPeak:test'],
     limits: {
-        Mtest: [0.3,  3.0],
+        Mtest: [0.1,  3.5],
         Atest: [0.1,  1.0],
-        Wtest: [0.05, 0.1],
+        Wtest: [0.05, 0.2],
     },
   },
   # Kernel used in the dataset; kernel needs to be registered.
@@ -42,15 +42,17 @@ network: {
   # Network to be used in the calculation. Needs to be registered
   type: 'UNet',
   # String identifier of the network
-  name: 'test',
+  name: 'test_Ns',
 }
 
 # -- Train and validation parameters
 train: {
   # Number of examples in the validation dataset
-  val_Nb: 1000,
+  val_Nb: 2000,
+  # Number of validations sets to be used
+  num_valid: 2,
   # Number of epochs used in the training step
-  epochs: 5,
+  epochs: 2,
   # Batch size used in the training
   batch_size: 100,
   # Learning rate decay parameter

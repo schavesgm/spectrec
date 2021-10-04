@@ -1,5 +1,6 @@
 # Import some built-in methods
 import os
+from typing import Optional
 
 # Import some third party modules
 import torch
@@ -21,7 +22,7 @@ class UNet(Network):
     # -- Identifier of the network
     _net_id: str = 'UNet'
 
-    def __init__(self, input_size: int, output_size: int, name: str = None, in_channels: int = 1, out_channels: int = 1, p: float = 0.0):
+    def __init__(self, input_size: int, output_size: int, name: Optional[str] = None, in_channels: int = 1, out_channels: int = 1, p: float = 0.0):
         
         # Call the base class constructor
         super().__init__()
@@ -38,10 +39,11 @@ class UNet(Network):
         # Amplify the data using a linear layer if needed
         if self.Li < 572:
             self.pre_amplify = nn.Sequential(
-                nn.Linear(input_size, 572, bias=False), nn.ReLU(inplace=True)
+                nn.BatchNorm1d(in_channels), nn.Linear(input_size, 572, bias=True), nn.ReLU(inplace=True)
             )
 
         # Generate the network architecture
+        self.norm_in = nn.BatchNorm1d(in_channels)
         self.initial = Stage(in_channels, 64, p)
         self.down_1  = DownStage(64, 128, p)
         self.down_2  = DownStage(128, 256, p)
@@ -63,6 +65,9 @@ class UNet(Network):
         # In case the input data is smaller than 572, use the preamplifier
         if self.Li < 572:
             x = self.pre_amplify(x)
+
+        # First, normalise the input
+        x = self.norm_in(x)
 
         # Initial stage of the network
         x_d1 = self.initial(x)
@@ -88,7 +93,6 @@ class UNet(Network):
             x = x.view(x.shape[0], 1, x.shape[1])
 
         return x
-
 
 if __name__ == '__main__':
     pass

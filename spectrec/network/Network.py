@@ -5,7 +5,6 @@ import os
 import torch.nn as nn
 import torch
 
-
 class Network(nn.Module):
     """ Base class used to define a network. """
 

@@ -9,7 +9,9 @@ import torch.nn.functional as F
 class Stage(nn.Module):
     """ One dimensional stage of a UNet network. """
 
-    def __init__(self, in_channels: int, out_channels: int, mid_channels: Optional[int] = None, p: float = 0.0):
+    def __init__(
+        self, in_channels: int, out_channels: int, mid_channels: Optional[int] = None, p: float = 0.0
+    ):
 
         # Call the base class constructor
         super().__init__()

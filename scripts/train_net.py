@@ -70,13 +70,3 @@ if __name__ == '__main__':
 
     # Save the dataset
     dataset.save_dataset(prefix, suffix, './status/dataset')
-
-    # # Save the network parameters to be used in the future
-    # net.save_params(net_name, path=os.path.join(input_info['output'], 'network'))
-
-    # # Validate the dataset
-    # dataset.test(
-    #     net, loss, network_info['val_prop'], device, network_info['batch_size'],
-    #     'val', prefix=dataset_pre, suffix=dataset_suf, path=monitor_path
-    # )
-

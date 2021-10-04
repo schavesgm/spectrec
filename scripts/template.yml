@@ -1,6 +1,6 @@
 # -- Template input file
 
-# Path where the monitoring and output data will be stored
+# -- Input information related to the dataset
 dataset: {
   id: {
     prefix: '',
@@ -27,8 +27,6 @@ dataset: {
   peaks: {
     # Peak class and identifier; use classname(:\w+)?. Classes need to be registered
     peaks_used:  ['GaussianPeak:test'],
-    max_np: 1,
-    fixed_np: True,
     limits: {
         Mtest: [0.3,  3.0],
         Atest: [0.1,  1.0],

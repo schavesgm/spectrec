@@ -17,6 +17,76 @@ from .NPKFactory import retrieve_kernel_class
 from .NPKFactory import retrieve_peak_class
 from .NPKFactory import retrieve_network_class
 
+def validate_dataset(content: dict):
+    """ Validate and spectrec's dataset input. """
+
+    # Assert several keys are present in the dictionary
+    assert all(k in content['dataset'] for k in ['id', 'parameters', 'generation', 'peaks', 'kernel'])
+
+    # Get all subdictionaries from the data
+    id_cont = content['dataset']['id']
+    pa_cont = content['dataset']['parameters']
+    ge_cont = content['dataset']['generation']
+    pe_cont = content['dataset']['peaks']
+
+    # Assert conditions on the id input
+    assert all(k in id_cont for k in ['prefix', 'suffix'])
+    assert isinstance(id_cont['prefix'], str)
+    assert isinstance(id_cont['suffix'], str)
+
+    # Assert conditions on the parameters input
+    assert all(k in pa_cont for k in ['Nb', 'Nt', 'Ns', 'Nw', 'wr', 'mp', 'fp'])
+    assert isinstance(pa_cont['Nb'], int) and pa_cont['Nb'] > 0
+    assert isinstance(pa_cont['Nt'], int) and pa_cont['Nt'] > 0
+    assert isinstance(pa_cont['Ns'], int) and pa_cont['Ns'] > 0
+    assert isinstance(pa_cont['Nw'], int) and pa_cont['Nw'] > 0
+    assert isinstance(pa_cont['mp'], int) and pa_cont['mp'] > 0
+    assert isinstance(pa_cont['wr'], list)
+    assert isinstance(pa_cont['fp'], bool)
+    assert pa_cont['Nb'] > pa_cont['Nw']
+    assert len(pa_cont['wr']) == 2
+    assert all(isinstance(w, (float, int)) for w in pa_cont['wr'])
+
+    # Assert conditions on the generation input
+    assert all(k in ge_cont for k in ['overwrite', 'basis', 'use_GPU'])
+    assert isinstance(ge_cont['overwrite'], bool)
+    assert isinstance(ge_cont['use_GPU'], bool)
+    assert isinstance(ge_cont['basis'], str)
+
+    # Assert some conditions on the peaks used in the dataset
+    assert all(k in pe_cont for k in ['peaks_used', 'limits'])
+    assert isinstance(pe_cont['peaks_used'], list)
+    assert isinstance(pe_cont['limits'], dict)
+    assert all(isinstance(p, str) for p in pe_cont['peaks_used'])
+    assert all(isinstance(v, list) for v in pe_cont['limits'].values())
+
+    for val in pe_cont['limits'].values():
+        assert len(val) == 2
+        assert all(isinstance(p, (int, float)) for p in val)
+
+    # Assert some conditions on the kernels used
+    assert isinstance(content['dataset']['kernel'], str)
+
+def validate_network(content: dict):
+    """ Validate the network input. """
+    assert (k in content['network'] for k in ['type', 'name'])
+    assert isinstance(content['network']['type'], str)
+    assert isinstance(content['network']['name'], str)
+
+def validate_train(content: dict):
+    """ Validate the train input. """
+    # Get the train dictionary
+    train = content['train']
+
+    # Assert some keys are present
+    assert (k in train for k in ['val_Nb', 'epochs', 'batch_size', 'lr_decay'])
+
+    # Assert some conditions on its contents
+    assert isinstance(train['val_Nb'], int)     and train['val_Nb'] > 0
+    assert isinstance(train['epochs'], int)     and train['epochs'] > 0
+    assert isinstance(train['batch_size'], int) and train['batch_size'] > 0
+    assert isinstance(train['lr_decay'], float)
+
 class SpectrecInput:
     """ Class to parse an input file to obtain all needed input parameters. """
 
@@ -25,6 +95,11 @@ class SpectrecInput:
         assert os.path.exists(input_path), f'{input_path = } does not exist'
         with open(input_path, 'r') as input_file:
             self.__content = yaml.safe_load(input_file)
+
+        # Validate all the input before continuing
+        validate_dataset(self.__content)
+        validate_network(self.__content)
+        validate_train(self.__content)
 
         # Save the input file used to load the contents
         self.__input_file = input_path

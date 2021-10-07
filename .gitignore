@@ -7,6 +7,7 @@ __pycache__
 # -- Ignore the results inside scripts
 scripts/status
 input.yml
+slurm
 
 # -- Ignore python environment folders
 bin

@@ -25,28 +25,29 @@ from .plots   import plot_example
 class Trainer:
     """ Trainer class used to train a network on a distributed architecture """
 
-    def __init__(self, train_info: dict, train_loader: DataLoader, model: Module, loss: Module, optimiser: Optimizer, is_main: bool):
+    def __init__(self, args, train_loader: DataLoader, model: Module, loss: Module, optimiser: Optimizer):
+
+        # Save all the argument information in the module
+        self.args = args
         
         # Save some important information in the class
-        self.train_info   = train_info
         self.model        = model
         self.optimiser    = optimiser
         self.loss         = loss
-        self.is_main      = is_main
         self.train_loader = train_loader
 
         # Set the fp16 scaler if contained inside train information
-        self.fp16_scaler = torch.cuda.amp.GradScaler() if train_info['fp16'] else None
+        self.fp16_scaler = torch.cuda.amp.GradScaler() if self.args.fp16 else None
 
         # If this is the main node, then generate some writers
-        if is_main:
-            self.writer = SummaryWriter(os.path.join('./status/runs/{}'.format(self.train_info['run_name'])))
+        if self.args.is_main:
+            self.writer = SummaryWriter(os.path.join('./status/runs/{}'.format(self.args.run_name)))
 
     def train_one_epoch(self, epoch: int, lr_schedule: _LRScheduler):
         """ Train one epoch using a lr_scheduler. """
 
         # Generate a logger to output some data
-        logger = TrainLogger(log_every=self.train_info['log_every'])
+        logger = TrainLogger(log_every=self.args.log_every)
 
         # Iterate for each example in the training loader
         for it, (input_data, label_data) in enumerate(logger.log_information(self.train_loader, header=f'Epoch :{epoch}')):
@@ -56,7 +57,7 @@ class Trainer:
             label_data = label_data.cuda(non_blocking=True)
 
             # Forward pass of the network using fp16 if needed
-            with torch.cuda.amp.autocast(self.train_info['fp16']):
+            with torch.cuda.amp.autocast(self.args.fp16):
                 preds = self.model(input_data)
                 loss  = self.loss(preds, label_data, input_data)
 
@@ -69,7 +70,7 @@ class Trainer:
             self.model.zero_grad()
 
             # If we are using fp16, then scale the data
-            if self.train_info['fp16']:
+            if self.args.fp16:
                 self.fp16_scaler.scale(loss).backward()
                 self.fp16_scaler.step(self.optimiser)
                 self.fp16_scaler.update()
@@ -87,7 +88,7 @@ class Trainer:
             del input_data, label_data, preds
 
             # Log some data to tensorboard
-            if self.is_main:
+            if self.args.is_main:
                 self.writer.add_scalar("train/loss", loss.item(), epoch * len(self.train_loader) + it)
 
         # Synchronise the logger between processes
@@ -99,9 +100,9 @@ class Trainer:
         """
 
         # Generate several validate writers to log some information to tensorboard
-        if self.is_main:
+        if self.args.is_main:
             valid_writers = [
-                SummaryWriter('./status/runs/{}/validate_{}'.format(self.train_info['run_name'], v)) \
+                SummaryWriter('./status/runs/{}/validate_{}'.format(self.args.run_name, v)) \
                 for v in range(len(validate_loaders))
             ]
 
@@ -112,7 +113,7 @@ class Trainer:
         lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(self.optimiser, T_0=10)
 
         # Training loop
-        for epoch in range(self.start_epoch, self.train_info['epochs']):
+        for epoch in range(self.start_epoch, self.args.epochs):
 
             # Generate the dataset
             self.train_loader.sampler.set_epoch(epoch)
@@ -154,7 +155,7 @@ class Trainer:
                     torch.cuda.synchronize()
 
                     # Plot some examples in the last iteration for the main
-                    if (it + 1) == len(valid) and self.is_main:
+                    if (it + 1) == len(valid) and self.args.is_main:
 
                         # Monitor some examples in the validation set
                         for nf in range(3):
@@ -181,13 +182,13 @@ class Trainer:
                 )
 
                 # If this is the original rank, then write some stuff to tensorboard
-                if self.is_main:
+                if self.args.is_main:
                     valid_writers[nv].add_scalar("train/loss", total_loss / len(valid), len(self.train_loader) * (epoch + 1))
                     valid_writers[nv].add_scalar("train/dL",   total_dL   / len(valid), epoch)
                     valid_writers[nv].add_scalar("train/dR",   total_dR   / len(valid), epoch)
 
             # Add the learning rate to tensorboard
-            if self.is_main:
+            if self.args.is_main:
                 self.writer.add_scalar("train/lr", torch.Tensor(lr_scheduler.get_last_lr()), len(self.train_loader) * (epoch + 1))
 
             # Step the lr_scheduler
@@ -197,14 +198,14 @@ class Trainer:
             [w.flush() for w in valid_writers + [self.writer]]
 
             # Save the data every some epochs to be able to resume it
-            if self.is_main and epoch % self.train_info['save_every'] == 0:
+            if self.args.is_main and epoch % self.args.save_every == 0:
                 self.save_information(epoch)
 
     def load_if_possible(self):
         """ Load information to resume training. """
 
         # Get the directories where the data is stored
-        runs_dirs = sorted(glob('./status/weights/{}/Epoch_*.pth'.format(self.train_info['run_name'])))
+        runs_dirs = sorted(glob('./status/weights/{}/Epoch_*.pth'.format(self.args.run_name)))
 
         if len(runs_dirs) == 0:
             self.start_epoch = 0
@@ -215,7 +216,7 @@ class Trainer:
             self.start_epoch = info['epoch']
             self.model.load_state_dict(info['model'])
             self.optimiser.load_state_dict(info['optimiser'])
-            if self.train_info['fp16']:
+            if self.args.fp16:
                 self.fp16_scaler.load_state_dict(info['fp16_scaler'])
             print('Loaded information ', runs_dirs[-1])
 
@@ -227,15 +228,15 @@ class Trainer:
             epoch=epoch+1,
             model=self.model.state_dict(),
             optimiser=self.optimiser.state_dict(),
-            train_info=self.train_info,
+            args=self.args,
         )
 
         # Add the floating scaler if used
-        if self.train_info['fp16']:
+        if self.args.fp16:
             state['fp16_scaler'] = self.fp16_scaler.state_dict()
 
         # Get the output path
-        out = './status/weights/{}/'.format(self.train_info['run_name'])
+        out = './status/weights/{}/'.format(self.args.run_name)
 
         # Create the path if it does not exist
         if not os.path.exists(out): os.makedirs(out)
@@ -243,15 +244,12 @@ class Trainer:
         # Save the dictionary
         torch.save(state, '{}/Epoch_{}.pth'.format(out, str(epoch).zfill(3)))
 
-def generate_validation_sets(dataset: SpectralDataset, train_info: dict, node_info: dict, rank: int) -> list[DataLoader]:
-    """ Generate several validation sets to be used at training. The number fo validation sets is
-    defined in train_info. The data is divided into different ranks using the DistributedSampler. 
-    """
+def generate_validation_sets(dataset: SpectralDataset, args) -> list[DataLoader]:
 
     # List that will contain the validation sets
     valid_list = []
 
-    for nv in range(train_info['num_valid']):
+    for nv in range(args.num_valid):
 
         # Generate a spectral dataset with the same configuration
         valid = SpectralDataset(
@@ -260,17 +258,17 @@ def generate_validation_sets(dataset: SpectralDataset, train_info: dict, node_in
         )
 
         # Generate the data inside the spectral dataset
-        valid.generate(train_info['val_Nb'], dataset.Ns, dataset.U)
+        valid.generate(args.val_Nb, dataset.Ns, dataset.U)
 
         # Sampler used in the distributed architecture
         sampler = DistributedSampler(
-            valid, shuffle=False, num_replicas=node_info['world_size'], rank=rank, seed=31
+            valid, shuffle=False, num_replicas=args.world_size, rank=args.rank, seed=args.seed
         )
 
         # Append a dataloader around the validation set
         loader = DataLoader(
-            valid, sampler=sampler, batch_size=train_info['batch_size'],
-            num_workers=node_info['workers'], pin_memory=True, drop_last=True
+            valid, sampler=sampler, batch_size=args.batch_size,
+            num_workers=args.workers, pin_memory=True, drop_last=True
         )
 
         # Append the loader to the validation list

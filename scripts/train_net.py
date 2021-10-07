@@ -98,9 +98,7 @@ if __name__ == '__main__':
     parser.add_argument('-slurm_ngpus', type=int, default=2, help='Number of GPUs per node in SLURM')
     parser.add_argument('-slurm_nnodes', type=int, default=1, help='Number of nodes used in SLURM')
     parser.add_argument('-slurm_partition', type=str, default='gpu', help='Partition where the SLURM job will be submitted')
-
-    # TODO: Eliminate default
-    parser.add_argument('-slurm_shared_dir', type=str, default='/home/s.989336/DDP/spectrec/scripts/slurm', help='Directory where SLURM output will be output')
+    parser.add_argument('-slurm_shared_dir', type=str, help='Directory where SLURM output will be output')
 
     # Parse the arguments
     args = parser.parse_args()

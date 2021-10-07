@@ -1,72 +1,97 @@
 # Load some built-in modules
-import os, re, json, datetime
+import argparse
 
 # Load some third-party modules
 import torch
-import matplotlib.pyplot as plt
-from torch.utils.tensorboard import SummaryWriter
 
-# Load the basic classic
-from spectrec.factory import SpectralDataset
+# Load some needed spectrec utilities
+from spectrec.utils   import SpectrecInput
 from spectrec.losses  import MSELoss
 
-# Load some utility functions and classes
-from spectrec.utils   import SpectrecInput
-from spectrec.utils   import train_network
+# Load the distributed architecture setup functions
+from spectrec.training import initialise_dist_nodes
+from spectrec.training import initiliase_dist_gpu
+from spectrec.training import Trainer
+from spectrec.training import generate_validation_sets
 
-# Peaks and kernels to be registered in the factory
-from spectrec.network import UNet
-from spectrec.factory import GaussianPeak
-from spectrec.factory import DeltaPeak
-from spectrec.factory import NRQCDKernel
+def train(gpu: int, config_file: str, node_info: dict):
+    """ Main train function to be spawned in the distributed architecture. """
 
-# Load the factory functions to register some peaks and kernels
-from spectrec.utils import register_peak_class
-from spectrec.utils import register_kernel_class
-from spectrec.utils import register_network_class
+    # Initialise the distributed gpu
+    rank = initiliase_dist_gpu(gpu, node_info)
 
-if __name__ == '__main__':
+    # Generate a spectrec input loader
+    spectrec_input = SpectrecInput(config_file)
 
-    # Register some peaks 
-    register_peak_class('GaussianPeak', GaussianPeak)
-    register_peak_class('DeltaPeak',    DeltaPeak)
+    # Register the external classes in the system
+    spectrec_input.register_classes(verbose=True)
 
-    # Register some kernels
-    register_kernel_class('NRQCDKernel', NRQCDKernel)
-
-    # Register some networks
-    register_network_class('UNet', UNet)
-
-    # Load a dictionary of input parameters
-    spectrec_input = SpectrecInput('./template.yml')
+    # Get the training info from the loader
+    train_info   = spectrec_input.parse_train_info()
+    dataset_info = spectrec_input.parse_dataset_info()
 
     # Save the information into tensorboard
     spectrec_input.write_to_tensorboard('./status/runs')
 
-    # Device where the data will be stored
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
     # Get a dataset with the input parameters
     dataset = spectrec_input.get_dataset(verbose=True)
 
-    # Get the network to be used in the training
-    network = spectrec_input.get_network()
+    # Save the dataset if possible
+    dataset.save_dataset(dataset_info['prefix'], dataset_info['suffix'])
 
-    # Load the parameters of the network if possible
-    network.load_params('./status/network')
+    # Generate a sampler to be used in the training
+    sampler = torch.utils.data.distributed.DistributedSampler(
+        dataset, shuffle=True, num_replicas=node_info['world_size'], rank=rank, seed=31
+    )
 
-    # Generate the loss function used in the training
+    # Generate a loader to be used in the training
+    loader = torch.utils.data.DataLoader(
+        dataset, sampler=sampler, batch_size=train_info['batch_size'], 
+        num_workers=node_info['workers'], pin_memory=True, drop_last=True
+    )
+    
+    # Generate several validation sets
+    valid_sets = generate_validation_sets(dataset, train_info, node_info, rank)
+
+    # Generate the model to be used in the training
+    network = spectrec_input.get_network().cuda(gpu)
+
+    # Synchronise the batch normalisation
+    network = torch.nn.SyncBatchNorm.convert_sync_batchnorm(network)
+
+    # Wrap the model around a distributed dataparallel
+    network = torch.nn.parallel.DistributedDataParallel(network, device_ids=[gpu])
+
+    # Generate the loss function. 
     loss = MSELoss()
 
-    # Train the network using the parameters passed
-    train_network(network, dataset, loss, spectrec_input.parse_train_info(), device, spectrec_input.run_name)
+    # Generate the optimiser to be used in the training. 
+    optim = torch.optim.Adam(network.parameters())
 
-    # Save the network parameters
-    network.save_params('./status/network')
+    # Generate a training object to train the network
+    Trainer(train_info, loader, network, loss, optim, (rank == 0)).train_and_validate(valid_sets)
 
-    # Get the prefix and suffix of the dataset to use it in the saving
-    dataset_info = spectrec_input.parse_dataset_info()
-    prefix, suffix = dataset_info['prefix'], dataset_info['suffix']
+if __name__ == '__main__':
 
-    # Save the dataset
-    dataset.save_dataset(prefix, suffix, './status/dataset')
+    # Decription message of the program
+    desc_msg = 'Train script to train a network for spectral reconstruction. The training can be distributed' + \
+               'among different nodes and GPUs to allow more efficiency.'
+
+    # Use a command line argument parser
+    parser = argparse.ArgumentParser(description=desc_msg)
+
+    # Add some arguments to the parser
+    parser.add_argument('-config', type=str, default='./template.yml', help='Path to configuration yaml file')
+    parser.add_argument('-gpus', type=str, default='0', help='Comma separated gpu device indices.')
+    parser.add_argument('-nodes', type=int, default=1, help='Number of nodes used in the distributed architecture.')
+    parser.add_argument('-node_rank', type=int, default=0, help='Rank corresponding to the current node.')
+    parser.add_argument('-workers', type=int, default=0, help='Number of subprocesses used when loading data.')
+
+    # Parse the arguments
+    args = parser.parse_args()
+
+    # Initialise the distributed nodes
+    node_info = initialise_dist_nodes(args.gpus, args.nodes, args.node_rank, args.workers)
+
+    # Spawn some distributed training.
+    torch.multiprocessing.spawn(train, args=(args.config, node_info), nprocs=node_info['gpus_per_node'])

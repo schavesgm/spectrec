@@ -56,20 +56,13 @@ def train(gpu: int, args):
 
     # Generate a loader to be used in the training
     loader = torch.utils.data.DataLoader(
-        dataset, sampler=sampler, batch_size=args.batch_size,
+        dataset=dataset, sampler=sampler, batch_size=args.batch_size,
         num_workers=args.workers, pin_memory=True, drop_last=True
     )
     
-    # Generate several validation sets
-    valid_sets = generate_validation_sets(dataset, args)
-
     # Generate the model to be used in the training
     network = spectrec_input.get_network().cuda(args.gpu)
-
-    # Synchronise the batch normalisation
     network = torch.nn.SyncBatchNorm.convert_sync_batchnorm(network)
-
-    # Wrap the model around a distributed dataparallel
     network = torch.nn.parallel.DistributedDataParallel(network, device_ids=[args.gpu])
 
     # Generate the loss function.
@@ -79,7 +72,9 @@ def train(gpu: int, args):
     optim = torch.optim.Adam(network.parameters())
 
     # Generate a training object to train the network
-    Trainer(args, loader, network, loss, optim).train_and_validate(valid_sets)
+    Trainer(args, loader, network, loss, optim).train_and_validate(
+        generate_validation_sets(dataset, args)
+    )
 
 if __name__ == '__main__':
 
@@ -100,10 +95,12 @@ if __name__ == '__main__':
 
     # Add the slurm information to the parser
     parser.add_argument('-slurm', action='store_true', help='Submit the scripts to SLURM')
-    parser.add_argument('-slurm-ngpus', type=int, help='Number of GPUs per node in SLURM')
-    parser.add_argument('-slurm-nnodes', type=int, help='Number of nodes used in SLURM')
-    parser.add_argument('-slurm_partition', type=str, help='Partition where the SLURM job will be submitted')
-    parser.add_argument('-slurm_shared_dir', type=str, help='Directory where SLURM output will be output')
+    parser.add_argument('-slurm_ngpus', type=int, default=2, help='Number of GPUs per node in SLURM')
+    parser.add_argument('-slurm_nnodes', type=int, default=1, help='Number of nodes used in SLURM')
+    parser.add_argument('-slurm_partition', type=str, default='gpu', help='Partition where the SLURM job will be submitted')
+
+    # TODO: Eliminate default
+    parser.add_argument('-slurm_shared_dir', type=str, default='/home/s.989336/DDP/spectrec/scripts/slurm', help='Directory where SLURM output will be output')
 
     # Parse the arguments
     args = parser.parse_args()
@@ -113,29 +110,26 @@ if __name__ == '__main__':
 
     # If we are running on the cloud, then use the SLURM movement
     if args.slurm:
-
-        # Generate a SLURM class to wrap the execution of 
+        # Generate a SLURM class to wrap the distributed execution
         class SLURMTrainer:
             def __init__(self, args):
                 self.args = args
 
             def __call__(self):
-                # TODO: Change this function to work with SLURM
                 initialise_dist_nodes(self.args)
                 train(None, self.args)
 
         # Generate the slurm output folder and attach the job identifier
-        args.slurm_shared_dir = get_slurm_output_directory(args.slurm_shared_dir) / "%j"
+        args.slurm_shared_dir = get_slurm_output_directory(args.slurm_shared_dir)
 
-        # Generate the folder for this specific job
-        Path(args.slurm_shared_dir).mkdir(parents=True, exist_ok=True)
+        # Append a localiser to change each jobID
+        args.slurm_shared_dir = args.slurm_shared_dir / "%j"
 
         # Generate a submitit executor
         executor = submitit.AutoExecutor(folder=args.slurm_shared_dir, slurm_max_num_timeout=30)
 
         # Update some parameters on submitit
         executor.update_parameters(
-            mem_gb=12 * args.slurm_ngpus,
             gpus_per_node=args.slurm_ngpus,
             tasks_per_node=args.slurm_ngpus,
             cpus_per_task=2,
@@ -151,7 +145,6 @@ if __name__ == '__main__':
 
     # If not, use the normal distributed dataparallel
     else:
-
         # Initialise the distributed nodes
         initialise_dist_nodes(args)
 

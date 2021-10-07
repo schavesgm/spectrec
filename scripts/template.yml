@@ -1,5 +1,13 @@
 # -- Template input file
 
+# -- Classes to be registered in the system. Once registered, they can be used in the
+# -- configuration files below. If empty, then no class is registered.
+to_register:
+  # - ['ClassName',     'path_to_class.py']
+  # - ['MyFakePeak',    './modules/MyPeak.py']
+  # - ['MyFakeKernel',  './modules/MyPeak.py']
+  # - ['MyFakeNetwork', './modules/MyPeak.py']
+
 # -- Input information related to the dataset
 dataset: {
   id: {
@@ -37,7 +45,7 @@ dataset: {
   kernel: 'NRQCDKernel',
 }
 
-# -- Define the network used
+# -- Define the network to be used in the training
 network: {
   # Network to be used in the calculation. Needs to be registered
   type: 'UNet',
@@ -52,9 +60,15 @@ train: {
   # Number of validations sets to be used
   num_valid: 2,
   # Number of epochs used in the training step
-  epochs: 2,
+  epochs: 3,
+  # Save every some epochs
+  save_every: 10,
+  # Log to the console every some iterations
+  log_every: 2,
   # Batch size used in the training
   batch_size: 100,
   # Learning rate decay parameter
   lr_decay: 0.95,
+  # Use floating point 16 in training to speed up calculations
+  fp16: True,
 }

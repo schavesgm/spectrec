@@ -1,55 +1,68 @@
+from typing import Union
+
 # Import user-defined modules
 from spectrec.factory import Peak
 from spectrec.factory import Kernel
 from spectrec.network import Network
 
-# -- Factory to deal with peaks {{{
-__registered_peaks = {}
+from spectrec.factory import GaussianPeak
+from spectrec.factory import DeltaPeak
+from spectrec.factory import NRQCDKernel
+from spectrec.network import UNet
 
-def register_peak_class(name: str, peak: Peak):
-    """ Register a peak to be used by the parser. """
-    assert issubclass(peak, Peak), f'{peak =} must be a subclass of Peak.'
-    __registered_peaks[name] = peak
+class NPKFactory:
 
-def retrieve_peak_class(name: str) -> Peak:
-    """ Return a peak class from the registered set. """
-    try:
-        return __registered_peaks[name]
-    except KeyError:
-        raise KeyError(f'{name =} is not registered: {__registered_peaks.keys()}')
-# -- }}}
+    # All instances of the class share these dictionaries
+    __registrations = {}
 
-# -- Factory to deal with kernels {{{
-__registered_kernels = {}
+    def __init__(self):
+        """ The init method registers some classes automatically """
 
-def register_kernel_class(name: str, kernel: Kernel):
-    """ Register a kernel to be used by the parser. """
-    assert issubclass(kernel, Kernel), f'{kernel =} must be a subclass of Kernel.'
-    __registered_kernels[name] = kernel
+        self.register_class('GaussianPeak', GaussianPeak)
+        self.register_class('DeltaPeak',    DeltaPeak)
+        self.register_class('NRQCDKernel',  NRQCDKernel)
+        self.register_class('UNet',         UNet)
 
-def retrieve_kernel_class(name: str) -> Kernel:
-    """ Return a kernel class from the registered set. """
-    try:
-        return __registered_kernels[name]
-    except KeyError:
-        raise KeyError(f'{name =} is not registered: {__registered_kernels.keys()}')
-# -- }}}
+    def register_class(self, name: str, to_register: Union[Peak, Kernel, Network]):
+        """ Register a class with a given name in the factory. """
 
-# -- Factory to deal with networks {{{
-__registered_networks = {}
+        # Assert the class to register is correct
+        assert issubclass(to_register, (Peak, Kernel, Network)), \
+            f'{to_register=} must be a subclass of [Peak, Kernel, Network]'
 
-def register_network_class(name: str, network: Network):
-    """ Register a network to be used by the parser. """
-    assert issubclass(network, Network), f'{network =} must be a subclass of Network.'
-    __registered_networks[name] = network
+        # Get the subclass of to_register
+        sub_class = to_register.__bases__
 
-def retrieve_network_class(name: str) -> Network:
-    """ Return a network class from the registered set. """
-    try:
-        return __registered_networks[name]
-    except KeyError:
-        raise KeyError(f'{name =} is not registered: {__registered_networks.keys()}')
-# -- }}}
+        # Register the subclass
+        self.__registrations[name] = to_register
+
+    def retrieve_class(self, name: str) -> Union[Peak, Kernel, Network]:
+        try:
+            return self.__registrations[name]
+        except KeyError:
+            raise KeyError(f'{name=} is not registered: {self.registered_names}')
+
+    def retrieve_all_of_same_type(self, type_name: str) -> dict[str, Union[Peak, Kernel, Network]]:
+        """ Get all registered items of the same type, where the type is defined by
+        the parent class they inherit from. For example, if type_name is 'Network', then
+        it will retrieve all the registered items that are childs of 'Network'. """
+
+        assert type_name.lower() in ['peak', 'kernel', 'network'], \
+            f"{type_name=} must be one of ['Peak', 'Kernel', 'Network']"
+
+        # Dictionary that will contain all the registered classes with same type
+        same_type = {}
+
+        # Iterate for all registered items
+        for name, reg_class in self.__registrations.items():
+            if type_name.lower() in str(reg_class.__base__).lower():
+                same_type[name] = reg_class
+
+        return same_type
+
+    @property
+    def registered_names(self) -> list[str]:
+        return list(self.__registrations.keys())
 
 if __name__ == '__main__':
     pass

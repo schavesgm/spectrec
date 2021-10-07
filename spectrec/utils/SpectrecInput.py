@@ -1,7 +1,9 @@
 # Import built-in modules
-import os, re, yaml
+import os
+import re
+import yaml
+import importlib.util
 from collections import namedtuple
-from datetime import date
 
 # Import some third-party modules
 import torch
@@ -13,12 +15,10 @@ from spectrec.factory import Kernel
 from spectrec.network import Network
 
 # Factory functions to instantiate kernel and peak classes
-from .NPKFactory import retrieve_kernel_class
-from .NPKFactory import retrieve_peak_class
-from .NPKFactory import retrieve_network_class
+from .NPKFactory import NPKFactory
 
 def validate_dataset(content: dict):
-    """ Validate and spectrec's dataset input. """
+    """ Validate spectrec dataset input. """
 
     # Assert several keys are present in the dictionary
     assert all(k in content['dataset'] for k in ['id', 'parameters', 'generation', 'peaks', 'kernel'])
@@ -69,7 +69,7 @@ def validate_dataset(content: dict):
 
 def validate_network(content: dict):
     """ Validate the network input. """
-    assert (k in content['network'] for k in ['type', 'name'])
+    assert all(k in content['network'] for k in ['type', 'name'])
     assert isinstance(content['network']['type'], str)
     assert isinstance(content['network']['name'], str)
 
@@ -78,15 +78,21 @@ def validate_train(content: dict):
     # Get the train dictionary
     train = content['train']
 
+    # Present keys in dictionary
+    keys = ['val_Nb', 'epochs', 'batch_size', 'lr_decay', 'num_valid', 'save_every', 'fp16', 'log_every']
+
     # Assert some keys are present
-    assert (k in train for k in ['val_Nb', 'epochs', 'batch_size', 'lr_decay', 'num_valid'])
+    assert all(k in train for k in keys)
 
     # Assert some conditions on its contents
     assert isinstance(train['val_Nb'], int)     and train['val_Nb'] > 0
     assert isinstance(train['num_valid'], int)  and train['num_valid'] > 0
     assert isinstance(train['epochs'], int)     and train['epochs'] > 0
     assert isinstance(train['batch_size'], int) and train['batch_size'] > 0
+    assert isinstance(train['save_every'], int) and train['save_every'] > 0
+    assert isinstance(train['log_every'], int)  and train['log_every'] > 0
     assert isinstance(train['lr_decay'], float)
+    assert isinstance(train['fp16'], bool)
 
 class SpectrecInput:
     """ Class to parse an input file to obtain all needed input parameters. """
@@ -101,6 +107,9 @@ class SpectrecInput:
         validate_dataset(self.__content)
         validate_network(self.__content)
         validate_train(self.__content)
+
+        # Assert that to_register is present
+        assert 'to_register' in self.__content
 
         # Save the input file used to load the contents
         self.__input_file = input_path
@@ -186,8 +195,38 @@ class SpectrecInput:
             'epochs':     self.__content['train']['epochs'],
             'batch_size': self.__content['train']['batch_size'],
             'lr_decay':   self.__content['train']['lr_decay'],
+            'fp16':       self.__content['train']['fp16'],
+            'save_every': self.__content['train']['save_every'],
+            'log_every':  self.__content['train']['log_every'],
+            'run_name':   self.run_name,
         }
     # -- }}}
+
+    def register_classes(self, verbose: bool = True):
+        """ Register all classes contained in the to_register dictionary. """
+
+        # Check if there are some classes to be registered
+        if self.__content['to_register'] is None:
+            if verbose: print(' --  No classes to be registered')
+            return
+
+        # Iterate for each module to be registered
+        for name, module_path in self.__content['to_register']:
+
+            # Generate a spec to the registering module
+            spec = importlib.util.spec_from_file_location(name, module_path)
+
+            # Generate the module to be registered
+            module = importlib.util.module_from_spec(spec)
+
+            # Execute the module to load the module
+            spec.loader.exec_module(module)
+
+            # Register the module in its correct position
+            NPKFactory().register_class(name, module.__getattribute__(name))
+
+            # Print some information about the registered classes
+            if verbose: print(f' --  Registered class {name} from {module_path}')
 
     # -- Object initialiser methods {{{
     def get_kernel(self) -> Kernel:
@@ -197,7 +236,7 @@ class SpectrecInput:
         dataset = self.parse_dataset_info()
 
         # Get the properties of the class
-        kernel  = retrieve_kernel_class(dataset['kernel'])
+        kernel  = NPKFactory().retrieve_class(dataset['kernel'])
 
         return kernel(self.dataset_params.Nt, self.dataset_params.Nw, self.dataset_params.wr)
 
@@ -215,7 +254,7 @@ class SpectrecInput:
         peak_ids    = dataset_info['peak_ids']
 
         # Transform the peak_types to a list of registered Peaks
-        peak_types = [retrieve_peak_class(p) for p in peak_types]
+        peak_types = [NPKFactory().retrieve_class(p) for p in peak_types]
 
         # Generate the spectral dataset object to be loaded
         dataset = SpectralDataset(peak_types, peak_limits, self.get_kernel(), mp, fp, peak_ids)
@@ -243,18 +282,18 @@ class SpectrecInput:
 
         # Check if the given dataset already exists
         if os.path.exists(dataset_path):
-            tell_me(verbose, f' -- Dataset {name} exists')
+            tell_me(verbose, f' --  Dataset {name} exists')
             if dataset_info['overwrite']:
                 if dataset_info['basis']:
-                    tell_me(verbose, '    -- Overwriting dataset using basis: ' + dataset_info['basis'])
+                    tell_me(verbose, '    --  Overwriting dataset using basis: ' + dataset_info['basis'])
                 else:
-                    tell_me(verbose, '    -- Overwriting dataset')
+                    tell_me(verbose, '    --  Overwriting dataset')
                     dataset.generate(Nb, Ns, basis=basis, use_GPU=dataset_info['use_GPU'])
             else:
-                tell_me(verbose, '    -- Loading dataset')
+                tell_me(verbose, '    --  Loading dataset')
                 dataset.load_dataset(Nb, Ns, prefix, suffix, './status/dataset')
         else:
-            tell_me(verbose, f' -- Generating {name} dataset')
+            tell_me(verbose, f' --  Generating {name} dataset')
             dataset.generate(Nb, Ns, basis=basis, use_GPU=dataset_info['use_GPU'])
 
         return dataset
@@ -266,7 +305,7 @@ class SpectrecInput:
         network_info = self.parse_network_info()
         
         # Get the network type
-        network = retrieve_network_class(network_info['type'])
+        network = NPKFactory().retrieve_class(network_info['type'])
 
         return network(self.dataset_params.Nt, self.dataset_params.Ns, name=network_info['name'])
     # -- }}}
@@ -308,7 +347,7 @@ class SpectrecInput:
         name = f'{prefix}_{name}' if prefix else name
         name = f'{name}_{suffix}' if suffix else name
 
-        return network['type'] + '/' + network['name'] + '/' + str(date.today()) + '_' + name
+        return network['type'] + '/' + network['name'] + '/' + name
     # -- }}}
 
 if __name__ == '__main__':

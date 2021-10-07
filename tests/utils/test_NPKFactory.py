@@ -11,84 +11,81 @@ from spectrec.factory import GaussianPeak
 from spectrec.factory import DeltaPeak
 from spectrec.network import UNet
 
-from spectrec.utils import register_kernel_class
-from spectrec.utils import register_peak_class
-from spectrec.utils import register_network_class
-from spectrec.utils import retrieve_kernel_class
-from spectrec.utils import retrieve_peak_class
-from spectrec.utils import retrieve_network_class
+from spectrec.utils import NPKFactory
+
+class FakeClass:
+    pass
+
+class FakePeak(Peak):
+    pass
+
+class FakeKernel(Kernel):
+    pass
+
+class FakeNetwork(Network):
+    pass
+
+@pytest.fixture(scope="session")
+def factory():
+    yield NPKFactory()
 
 class TestNPKFactory:
 
-    def test_peak_factory(self):
-        """ Test the peak factory functions. """
+    def test_factory_initialiser(self, factory):
+        """ Assert that the class already registers some values. """
 
-        # Register some peaks in the class
-        register_peak_class('GaussianPeak', GaussianPeak)
+        # Assert that some items are already in the factory
+        assert 'GaussianPeak' in factory.registered_names
+        assert 'DeltaPeak'    in factory.registered_names
+        assert 'NRQCDKernel'  in factory.registered_names
+        assert 'UNet'         in factory.registered_names
 
-        # Retrieve the class and assert is subclass
-        assert issubclass(retrieve_peak_class('GaussianPeak'), Peak)
+        # Assert that the peaks are correctly registered
+        assert issubclass(factory.retrieve_class('GaussianPeak'), Peak)
+        assert issubclass(factory.retrieve_class('DeltaPeak'),    Peak)
+        assert issubclass(factory.retrieve_class('NRQCDKernel'),  Kernel)
+        assert issubclass(factory.retrieve_class('UNet'),         Network)
 
-        # Try registering a kernel into the peaks
+    def test_factory_register(self, factory):
+        """ Test the registration of some classes. """
+
+        # Try registering some classes
+        factory.register_class('FakePeak',    FakePeak)
+        factory.register_class('FakeKernel',  FakePeak)
+        factory.register_class('FakeNetwork', FakePeak)
+        assert 'FakePeak'    in factory.registered_names
+        assert 'FakeKernel'  in factory.registered_names
+        assert 'FakeNetwork' in factory.registered_names
+
+        # Now, try registering a non-valid class
         with pytest.raises(AssertionError) as info:
-            register_peak_class('FakePeak', NRQCDKernel)
+            factory.register_class('FakeClass', FakeClass)
 
-        # Assert an error is raised when adding a false peak
-        assert 'must be a subclass of Peak' in str(info.value)
+        # Assert an error is raised
+        assert 'must be a subclass of [Peak, Kernel, Network]' in str(info.value)
 
-        # Try obtaining a peak that is not valid
+    def test_factory_retrieve(self, factory):
+        """ Test retrieving some classes """
+
+        # Try retrieving a class that is not registered
         with pytest.raises(KeyError) as info:
-            retrieve_peak_class('DeltaPeak')
+            factory.retrieve_class('FakeClass')
 
-        # Assert an error is raised when retrieving an unregistered peak
+        # Assert an error is raised
         assert 'is not registered' in str(info.value)
 
-    def test_kernel_factory(self):
-        """ Test the kernel factory functions. """
+    def test_factory_retrieve_all_same_type(self, factory):
+        """ Test the behaviour of retrieve_all_same_type. """
 
-        # Register some kernels in the class
-        register_kernel_class('NRQCDKernel', NRQCDKernel)
+        # Get all peak, kernel and network classes
+        peaks    = factory.retrieve_all_of_same_type('peak')
+        kernels  = factory.retrieve_all_of_same_type('kernel')
+        networks = factory.retrieve_all_of_same_type('network')
 
-        # Retrieve the class and assert is subclass
-        assert issubclass(retrieve_kernel_class('NRQCDKernel'), Kernel)
-
-        # Try registering a peak into the kernels
-        with pytest.raises(AssertionError) as info:
-            register_kernel_class('FakePeak', DeltaPeak)
-
-        # Assert an error is raised when adding a false kernel
-        assert 'must be a subclass of Kernel' in str(info.value)
-
-        # Try obtaining a kernel that is not valid
-        with pytest.raises(KeyError) as info:
-            retrieve_kernel_class('FakeKernel')
-
-        # Assert an error is raised when retrieving an unregistered kernel
-        assert 'is not registered' in str(info.value)
-
-    def test_network_factory(self):
-        """ Test the network factory functions. """
-
-        # Register a network in the class
-        register_network_class('UNet', UNet)
-
-        # Retrieve the class and assert is subclass
-        assert issubclass(retrieve_network_class('UNet'), Network)
-
-        # Try registering a peak into the networks
-        with pytest.raises(AssertionError) as info:
-            register_network_class('FakeNet', DeltaPeak)
-
-        # Assert an error is raised when adding a false network
-        assert 'must be a subclass of Network' in str(info.value)
-
-        # Try obtaining a network that is not valid
-        with pytest.raises(KeyError) as info:
-            retrieve_network_class('FakeNet')
-
-        # Assert an error is raised when retrieving an unregistered network
-        assert 'is not registered' in str(info.value)
-
+        # Assert that some items are inside each of them
+        assert all(n in peaks    for n in ['GaussianPeak', 'DeltaPeak'])
+        assert all(n in kernels  for n in ['NRQCDKernel'])
+        assert all(n in networks for n in ['UNet'])
 
 if __name__ == '__main__':
     pass

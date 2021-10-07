@@ -1,9 +1,12 @@
+# -- Most code in this file is based on: git@github.com:ramyamounir/Template.git
+
 # Import built-in modules
 import os
 import random
 import re
 import signal
 import subprocess
+import argparse
 from pathlib import Path
 
 # Import third-party modules
@@ -12,6 +15,7 @@ import submitit
 import torch.distributed as dist
 import torch.backends.cudnn as cudnn
 
+# -- Utility functions {{{
 def disable_print_for_non_main(is_main: bool):
     """ Disable printing for non-master (rank=0) processes """
     import builtins as __builtins__
@@ -48,15 +52,23 @@ def get_slurm_output_directory(shared_path: str) -> Path:
     p.mkdir(exist_ok=True)
 
     return p
+# -- }}}
 
+# -- Function handlers to handle some signals {{{
 def handle_sigusr1(signum, frame):
     os.system(f'scontrol requeue {os.getenv("SLURM_JOB_ID")}')
     exit()
 
 def handle_sigterm(signum, frame):
     pass
+# -- }}}
 
-def initialise_dist_nodes(args):
+def initialise_dist_nodes(args: argparse.Namespace):
+    """ Function used to initialise the distributed nodes. It acts differently
+    depending on whether we are training locally on in a SLURM server. It
+    sets the number of gpus per node, the url used to communicate between
+    processes and the rank and world_size of each GPU.
+    """
 
     # If the job is a SLURM job, then act differently
     if 'SLURM_JOB_ID' in os.environ:
@@ -91,7 +103,11 @@ def initialise_dist_nodes(args):
         args.url            = f'tcp://localhost:{args.port}'
         args.world_size     = args.ngpus_per_node
 
-def initiliase_dist_gpu(gpu: int, args) -> int:
+def initiliase_dist_gpu(gpu: int, args: argparse.Namespace) -> int:
+    """ Function to set the code for a distributed GPU. The functions acts differently
+    depending on whether we are training on a SLURM server or locally. The function
+    sets the gpu and rank for of the given GPU and also initialises the group process.
+    """
 
     # Act differently depending on type of job
     if args.slurm:

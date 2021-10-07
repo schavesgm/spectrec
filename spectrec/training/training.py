@@ -2,6 +2,7 @@
 import os
 import math
 import sys
+import argparse
 
 from glob import glob
 
@@ -25,7 +26,7 @@ from .plots   import plot_example
 class Trainer:
     """ Trainer class used to train a network on a distributed architecture """
 
-    def __init__(self, args, train_loader: DataLoader, model: Module, loss: Module, optimiser: Optimizer):
+    def __init__(self, args: argparse.Namespace, train_loader: DataLoader, model: Module, loss: Module, optimiser: Optimizer):
 
         # Save all the argument information in the module
         self.args = args

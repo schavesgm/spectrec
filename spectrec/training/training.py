@@ -133,8 +133,6 @@ class Trainer:
                 # Get the total loss, total dL and dR
                 total_loss, total_dL, total_dR = 0.0, 0.0, 0.0
 
-                import matplotlib.pyplot as plt
-
                 for it, (input_data, label_data) in enumerate(valid):
 
                     # Move the inputs to cuda
@@ -151,7 +149,7 @@ class Trainer:
                     # Generate the difference in spectral functions
                     total_dR += ((label_data - preds)[:, 0, :] @ valid.dataset.U.T.cuda()).abs().max(axis=1).values.mean().item()
 
-                    # Log some data to the console
+                    # Synchronise the CUDA devices
                     torch.cuda.synchronize()
 
                     # Plot some examples in the last iteration for the main
@@ -170,7 +168,7 @@ class Trainer:
                             # Add the figure to the writer
                             self.writer.add_figure(f"train/validate{nv}_ex{nf}", figure, epoch)
 
-                    # Delete the tensors
+                    # Delete some tensors
                     del input_data, label_data, preds
 
                 # Log some information to the console
@@ -193,9 +191,6 @@ class Trainer:
 
             # Step the lr_scheduler
             lr_scheduler.step()
-
-            # Flush and close all the writers information
-            [w.flush() for w in valid_writers + [self.writer]]
 
             # Save the data every some epochs to be able to resume it
             if self.args.is_main and epoch % self.args.save_every == 0:

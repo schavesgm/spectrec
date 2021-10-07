@@ -2,10 +2,8 @@
 import os
 import random
 import re
-import builtins
 import signal
 import subprocess
-
 from pathlib import Path
 
 # Import third-party modules
@@ -14,16 +12,17 @@ import submitit
 import torch.distributed as dist
 import torch.backends.cudnn as cudnn
 
-def disable_print_for_non_main(rank: int):
+def disable_print_for_non_main(is_main: bool):
     """ Disable printing for non-master (rank=0) processes """
-    builtin_print = builtins.print
+    import builtins as __builtins__
+    builtin_print = __builtins__.print
 
     def print(*args, **kwargs):
         force = kwargs.pop('force', False)
-        if (rank == 0) or force:
+        if is_main or force:
             builtin_print(*args, **kwargs)
     
-    builtins.print = print
+    __builtins__.print = print
 
 def fix_random_seeds(seed: int = 31):
     """ Fix the random seeds for torch random numbers. 
@@ -42,16 +41,13 @@ def get_slurm_output_directory(shared_path: str) -> Path:
     # Check if a directory exists, if not, just create it
     if not os.path.exists(shared_path): os.makedirs(shared_path)
 
-    # If the directory exists, then create a subfolder for the user
-    if Path(shared_path).is_dir():
+    # The output will be in an specific USER folder
+    p = Path(os.path.join(shared_path, os.getenv('USER')))
 
-        # The output will be in an specific USER folder
-        p = Path(os.path.join(shared_path, os.getenv('USER')))
+    # Create the user folder if it does not exist
+    p.mkdir(exist_ok=True)
 
-        # Create the user folder if it does not exist
-        p.mkdir(exist_ok=True)
-
-        return p
+    return p
 
 def handle_sigusr1(signum, frame):
     os.system(f'scontrol requeue {os.getenv("SLURM_JOB_ID")}')
@@ -61,9 +57,6 @@ def handle_sigterm(signum, frame):
     pass
 
 def initialise_dist_nodes(args):
-
-    # Generate the port used in the distributed training
-    port = random.randint(49152, 65535)
 
     # If the job is a SLURM job, then act differently
     if 'SLURM_JOB_ID' in os.environ:
@@ -81,7 +74,7 @@ def initialise_dist_nodes(args):
         host_name = stdout.decode().splitlines()[0]
 
         # Url used in the distribution
-        args.url = f'tcp://{host_name}:{port}'
+        args.url = f'tcp://{host_name}:{args.port}'
 
         # Distributed parameters
         args.rank       = int(os.getenv('SLURM_NODEID')) * args.ngpus_per_node
@@ -93,9 +86,9 @@ def initialise_dist_nodes(args):
         os.environ['CUDA_VISIBLE_DEVICES'] = args.gpus
 
         # Define some important variables
-        args.rank           = 0
         args.ngpus_per_node = torch.cuda.device_count()
-        args.url            = f'tcp://localhost:{port}'
+        args.rank           = 0
+        args.url            = f'tcp://localhost:{args.port}'
         args.world_size     = args.ngpus_per_node
 
 def initiliase_dist_gpu(gpu: int, args) -> int:
@@ -107,7 +100,7 @@ def initiliase_dist_gpu(gpu: int, args) -> int:
         job_env = submitit.JobEnvironment()
 
         # Update the output directory with the jobID
-        args.output_dir = Path(str(args.output_dir).replace('%j', str(job_env.job_id)))
+        args.slurm_shared_dir = Path(str(args.slurm_shared_dir).replace('%j', str(job_env.job_id)))
 
         # Get the local rank (GPU) and the global rank (node * world_size + GPU)
         args.gpu  = job_env.local_rank
@@ -116,7 +109,7 @@ def initiliase_dist_gpu(gpu: int, args) -> int:
         
         # Get the local rank (GPU) and the global rank (GPU)
         args.gpu   = gpu
-        args.rank += gpu
+        args.rank  += gpu
 
     # Initialise the process group of this gpu
     dist.init_process_group(backend=args.backend, init_method=args.url, world_size=args.world_size, rank=args.rank)
@@ -129,7 +122,6 @@ def initiliase_dist_gpu(gpu: int, args) -> int:
 
     # Set some properties in the backend
     cudnn.benchmark = True
-    cudnn.enabled   = True
 
     # Synchronise all devices
     dist.barrier()
@@ -138,7 +130,7 @@ def initiliase_dist_gpu(gpu: int, args) -> int:
     args.is_main = (args.rank == 0)
 
     # Disable printing for non master ranks
-    disable_print_for_non_main(args.rank)
+    disable_print_for_non_main(args.is_main)
 
 if __name__ == '__main__':
     pass

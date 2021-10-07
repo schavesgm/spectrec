@@ -285,12 +285,12 @@ class SpectrecInput:
             tell_me(verbose, f' --  Dataset {name} exists')
             if dataset_info['overwrite']:
                 if dataset_info['basis']:
-                    tell_me(verbose, '    --  Overwriting dataset using basis: ' + dataset_info['basis'])
+                    tell_me(verbose, '    --   Overwriting dataset using basis: ' + dataset_info['basis'])
                 else:
-                    tell_me(verbose, '    --  Overwriting dataset')
+                    tell_me(verbose, '    --   Overwriting dataset')
                     dataset.generate(Nb, Ns, basis=basis, use_GPU=dataset_info['use_GPU'])
             else:
-                tell_me(verbose, '    --  Loading dataset')
+                tell_me(verbose, '     --  Loading dataset')
                 dataset.load_dataset(Nb, Ns, prefix, suffix, './status/dataset')
         else:
             tell_me(verbose, f' --  Generating {name} dataset')

@@ -162,6 +162,9 @@ class SpectralDataset(torch.utils.data.Dataset):
         with open(os.path.join(output_path, 'info.json'), 'w') as f:
             json.dump(self.info, f, indent=4)
 
+        # Output some information to the console
+        print(f' --  Saved dataset {identifier} at: {output_path}')
+
     def load_dataset(self, Nb: int, Ns: int, prefix: str = '', suffix: str = '', path: str = './status/dataset') -> None:
         """ Load the dataset from a given path. A prefix and a suffix can be appended to the
         name locator to further specify the dataset. The name convention to define a dataset is

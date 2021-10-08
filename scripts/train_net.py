@@ -79,7 +79,10 @@ def train(gpu: int, args):
 if __name__ == '__main__':
 
     # Decription message of the program
-    desc_msg = 'Training script for spectral reconstruction. It allows distributed data parallel jobs'
+    desc_msg = 'Training script for spectral reconstruction. It allows distributed data parallel jobs.' + \
+        'There are two different distributed architectures available: local and SLURM. In local, one can' + \
+        'train on several GPUs but only one node. In contrast, in SLURM, one can submit SLURM jobs. As a' + \
+        'consequence, the training can be parallelised on several nodes each with a given number of GPUs.'
 
     # Use a command line argument parser
     parser = argparse.ArgumentParser(description=desc_msg)
@@ -88,13 +91,14 @@ if __name__ == '__main__':
     parser.add_argument('-config', type=str, default='./template.yml', help='Path to configuration yaml file')
     parser.add_argument('-seed', type=int, default=31, help='Seed to be used in the random engines')
     parser.add_argument('-backend', type=str, default='nccl', help='Used torch distributed backend.')
+    parser.add_argument('-print_all', action='store_true', default=False, help='Log information with all processes.')
+    parser.add_argument('-workers', type=int, default=2, help='Number of subprocesses used when loading data.')
     
     # Add some local run information
-    parser.add_argument('-gpus', type=str, default='0', help='Comma separated gpu device indices. Only works if not on SLURM')
-    parser.add_argument('-workers', type=int, default=2, help='Number of subprocesses used when loading data.')
+    parser.add_argument('-gpus', type=str, default='0', help='Comma separated gpu device indices. Only useful if -slurm is not passed.')
 
     # Add the slurm information to the parser
-    parser.add_argument('-slurm', action='store_true', help='Submit the scripts to SLURM')
+    parser.add_argument('-slurm', action='store_true', help='Use SLURM to train the model.')
     parser.add_argument('-slurm_ngpus', type=int, default=2, help='Number of GPUs per node in SLURM')
     parser.add_argument('-slurm_nnodes', type=int, default=1, help='Number of nodes used in SLURM')
     parser.add_argument('-slurm_partition', type=str, default='gpu', help='Partition where the SLURM job will be submitted')

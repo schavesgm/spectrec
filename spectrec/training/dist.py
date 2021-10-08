@@ -16,11 +16,15 @@ import torch.distributed as dist
 import torch.backends.cudnn as cudnn
 
 # -- Utility functions {{{
-def disable_print_for_non_main(is_main: bool):
+def disable_print_for_non_main(is_main: bool, print_all: bool):
     """ Disable printing for non-master (rank=0) processes """
     import builtins as __builtins__
     builtin_print = __builtins__.print
 
+    # If print_all is enabled, then do nothing
+    if print_all: return
+
+    # If not, remove the print for non-main processes
     def print(*args, **kwargs):
         force = kwargs.pop('force', False)
         if is_main or force:
@@ -146,7 +150,7 @@ def initiliase_dist_gpu(gpu: int, args: argparse.Namespace) -> int:
     args.is_main = (args.rank == 0)
 
     # Disable printing for non master ranks
-    disable_print_for_non_main(args.is_main)
+    disable_print_for_non_main(args.is_main, args.print_all)
 
 if __name__ == '__main__':
     pass

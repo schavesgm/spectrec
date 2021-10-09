@@ -18,30 +18,11 @@ from spectrec.training import Trainer
 from spectrec.training import generate_validation_sets
 from spectrec.training import get_slurm_output_directory
 
-def train(gpu: int, args):
+def train(gpu: int, args, spectrec_input):
     """ Main train function to be spawned in the distributed architecture. """
 
     # Initialise the distributed gpu
     initiliase_dist_gpu(gpu, args)
-
-    # Generate a spectrec input loader
-    spectrec_input = SpectrecInput(args.config)
-
-    # Register the external classes in the system
-    spectrec_input.register_classes(verbose=True)
-
-    # Set some needed information from the input into args
-    for key, value in spectrec_input.parse_train_info().items():
-        setattr(args, key, value)
-
-    for key, value in spectrec_input.parse_dataset_info().items():
-        setattr(args, key, value)
-
-    for key, value in spectrec_input.parse_network_info().items():
-        setattr(args, key, value)
-
-    # Save the information into tensorboard
-    spectrec_input.write_to_tensorboard('./status/runs')
 
     # Get a dataset with the input parameters
     dataset = spectrec_input.get_dataset(verbose=True)
@@ -102,7 +83,7 @@ if __name__ == '__main__':
     parser.add_argument('-slurm_ngpus', type=int, default=2, help='Number of GPUs per node in SLURM')
     parser.add_argument('-slurm_nnodes', type=int, default=1, help='Number of nodes used in SLURM')
     parser.add_argument('-slurm_partition', type=str, default='gpu', help='Partition where the SLURM job will be submitted')
-    parser.add_argument('-slurm_shared_dir', type=str, help='Directory where SLURM output will be output')
+    parser.add_argument('-slurm_shared_dir', type=str, default='slurm', help='Directory where SLURM output will be output')
 
     # Parse the arguments
     args = parser.parse_args()
@@ -110,16 +91,36 @@ if __name__ == '__main__':
     # Add some information to the arguments
     args.port = random.randint(49152, 65535)
 
+    # Generate a spectrec input object before submitting the job
+    spectrec_input = SpectrecInput(args.config)
+
+    # Register the external classes in the system
+    spectrec_input.register_classes(verbose=True)
+
+    # Set some needed information from the input into args
+    for key, value in spectrec_input.parse_train_info().items():
+        setattr(args, key, value)
+
+    for key, value in spectrec_input.parse_dataset_info().items():
+        setattr(args, key, value)
+
+    for key, value in spectrec_input.parse_network_info().items():
+        setattr(args, key, value)
+
+    # Save the information into tensorboard
+    spectrec_input.write_to_tensorboard('./status/runs')
+
     # If we are running on the cloud, then use the SLURM movement
     if args.slurm:
         # Generate a SLURM class to wrap the distributed execution
         class SLURMTrainer:
-            def __init__(self, args):
-                self.args = args
+            def __init__(self, args, spectrec_input):
+                self.args  = args
+                self.input = spectrec_input
 
             def __call__(self):
                 initialise_dist_nodes(self.args)
-                train(None, self.args)
+                train(None, self.args, self.input)
 
         # Generate the slurm output folder and attach the job identifier
         args.slurm_shared_dir = get_slurm_output_directory(args.slurm_shared_dir)
@@ -142,7 +143,7 @@ if __name__ == '__main__':
         )
 
         # Execute the job
-        job = executor.submit(SLURMTrainer(args))
+        job = executor.submit(SLURMTrainer(args, spectrec_input))
         print(f'Submitted job_id: {job.job_id}')
 
     # If not, use the normal distributed dataparallel
@@ -151,4 +152,4 @@ if __name__ == '__main__':
         initialise_dist_nodes(args)
 
         # Spawn some distributed training.
-        torch.multiprocessing.spawn(train, args=(args,), nprocs=args.ngpus_per_node)
+        torch.multiprocessing.spawn(train, args=(args, spectrec_input), nprocs=args.ngpus_per_node)
